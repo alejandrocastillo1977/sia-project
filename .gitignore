@@ -1,0 +1,11 @@
+# Ignorar entorno virtual y cachés
+.venv/
+__pycache__/
+*.pyc
+
+# Ignorar datos temporales
+data/outputs/
+data/argos_samples/
+
+# Ignorar configuración interna de Streamlit
+.streamlit/
