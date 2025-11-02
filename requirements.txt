@@ -1,4 +1,36 @@
-streamlit
-pandas
-numpy
-openpyxl
+# ---------------------------------------------
+# Sistema de Inteligencia Académica (SIA)
+# Entorno de desarrollo local - Requisitos Python
+# Versión 1.1 - Noviembre 2025
+# ---------------------------------------------
+
+# --- Núcleo principal ---
+streamlit>=1.38.0
+pandas>=2.2.0
+numpy>=1.26.0
+openpyxl>=3.1.2
+
+# --- Base de datos y persistencia ---
+SQLAlchemy>=2.0.25
+sqlite-utils>=3.36.0
+
+# --- Validación y estructura de datos ---
+pydantic>=2.8.0
+
+# --- Visualización y reportes ---
+plotly>=5.20.0
+matplotlib>=3.8.0
+
+# --- Exportación de reportes (PDF / Excel) ---
+fpdf2>=2.7.6
+xlsxwriter>=3.1.2
+
+# --- Utilidades y formato ---
+python-dotenv>=1.0.1
+rich>=13.7.0
+
+# --- Pruebas y calidad ---
+pytest>=8.0.0
+black>=24.3.0
+ruff>=0.6.0
+
