@@ -6,6 +6,7 @@ __pycache__/
 # Ignorar datos temporales
 data/outputs/
 data/argos_samples/
+data/*.db
 
 # Ignorar configuración interna de Streamlit
 .streamlit/
