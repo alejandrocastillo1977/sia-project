@@ -138,3 +138,91 @@ def datos_estudiante(id_estudiante: str) -> Optional[Dict[str, Any]]:
         """, (id_estudiante,))
         row = cur.fetchone()
     return dict(row) if row else None
+
+
+def obtener_notas_por_umbral(tipo: str, periodo: str, umbral: float = 3.0) -> list[dict]:
+    """
+    Retorna los estudiantes con notas bajo o sobre un umbral definido.
+    tipo: "bajo" (< umbral) o "alto" (>= umbral)
+    periodo: id_periodo a analizar (por ejemplo '202507')
+    """
+    operador = "<" if tipo == "bajo" else ">="
+    query = f"""
+        SELECT e.id_estudiante,
+               e.nombre,
+               e.programa,
+               i.id_curso,
+               c.nombre AS nombre_curso,
+               i.nota,
+               i.version_periodo
+        FROM Inscripcion i
+        JOIN Estudiante e ON e.id_estudiante = i.id_estudiante
+        JOIN Curso c ON c.id_curso = i.id_curso
+        WHERE i.id_periodo = ? AND i.nota {operador} ?
+        ORDER BY i.nota ASC;
+    """
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute(query, (periodo, umbral))
+        rows = cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+def listar_periodos() -> list[str]:
+    """Devuelve todos los periodos registrados en la BD."""
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT DISTINCT id_periodo FROM PeriodoAcademico ORDER BY id_periodo DESC;")
+        rows = [r[0] for r in cur.fetchall()]
+    return rows
+
+
+# -------------------------------------------------
+# FUNCIONES ANALÍTICAS (Hito 8 – Umbrales)
+# -------------------------------------------------
+
+def listar_periodos() -> list[str]:
+    """
+    Devuelve todos los periodos académicos registrados en la base de datos.
+    """
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT DISTINCT id_periodo
+            FROM PeriodoAcademico
+            ORDER BY id_periodo DESC;
+        """)
+        rows = [r[0] for r in cur.fetchall()]
+    return rows
+
+
+def obtener_notas_por_umbral(tipo: str, periodo: str, umbral: float = 3.0) -> list[dict]:
+    """
+    Retorna los estudiantes con notas bajo o sobre un umbral definido.
+      tipo: "bajo" (< umbral) o "alto" (>= umbral)
+      periodo: ID del periodo académico (por ejemplo '202507')
+    """
+    operador = "<" if tipo == "bajo" else ">="
+    query = f"""
+        SELECT e.id_estudiante,
+               e.nombre,
+               e.programa,
+               i.id_curso,
+               c.nombre AS nombre_curso,
+               i.nota,
+               i.version_periodo
+        FROM Inscripcion i
+        JOIN Estudiante e ON e.id_estudiante = i.id_estudiante
+        JOIN Curso c ON c.id_curso = i.id_curso
+        WHERE i.id_periodo = ? AND i.nota {operador} ?
+        ORDER BY i.nota ASC;
+    """
+
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute(query, (periodo, umbral))
+        rows = cur.fetchall()
+    return [dict(r) for r in rows]
+

@@ -1,49 +1,54 @@
 import streamlit as st
-from pathlib import Path
-import os
 from database.db_init import create_database, DB_PATH
-
-# --- CONFIGURACIÓN: puedes cambiar a "produccion" cuando despliegues ---
-MODO = "desarrollo"  # opciones: "desarrollo" o "produccion"
+from database.analisis_datos import validar_datos_analiticos
+import os
 
 def mostrar_admin():
-    st.title("⚙️ Panel de Mantenimiento – Base de Datos")
-
+    st.title("⚙️ Administración del Sistema SIA")
     st.markdown("""
-    Este módulo permite **reiniciar completamente la base de datos local (`sia.db`)**.<br>
-    ⚠️ **Advertencia:** esta acción eliminará todos los datos actuales
-    y volverá a crear la estructura vacía a partir de `schema.sql`.
-    """, unsafe_allow_html=True)
+    Este módulo permite realizar tareas de mantenimiento y diagnóstico:
+    - **Reiniciar completamente la base de datos (sia.db)**  
+    - **Validar la calidad y cantidad de datos cargados (análisis analítico)**
+    """)
 
     st.divider()
+    st.subheader("🧹 Reinicio de la base de datos")
+    st.warning("""
+    Esta acción eliminará completamente la base de datos actual y la recreará desde el esquema `schema.sql`.
+    **⚠️ Usa esta función con precaución.**
+    """)
 
-    if DB_PATH.exists():
-        st.info(f"📂 Base de datos actual: `{DB_PATH}`")
-        st.caption(f"Última modificación: {os.path.getmtime(DB_PATH):.0f}")
-    else:
-        st.warning("⚠️ No se encontró la base de datos actual. Se creará una nueva si ejecutas el reinicio.")
+    # --- Confirmación de seguridad ---
+    confirm_text = st.text_input("Para confirmar, escribe exactamente: BORRAR TODO", type="default")
 
-    # --- Control de acceso según modo ---
-    if MODO == "produccion":
-        st.error("🚫 Este entorno está en modo PRODUCCIÓN. No se permite reiniciar la base de datos desde la interfaz.")
-        return
-
-    st.markdown("### 🧩 Reinicio de base de datos (solo modo desarrollo)")
-    st.caption("Esta opción solo está disponible en entornos locales o de prueba.")
-
-    # Confirmación explícita
-    confirm_text = st.text_input("Escribe 'BORRAR TODO' para confirmar el reinicio:")
-
-    if confirm_text.strip().upper() == "BORRAR TODO":
-        if st.button("🧹 Borrar y reiniciar base de datos"):
+    if st.button("🗑️ Eliminar y recrear base de datos"):
+        if confirm_text.strip().upper() == "BORRAR TODO":
             try:
                 if DB_PATH.exists():
                     os.remove(DB_PATH)
-                    st.warning("🗑️ Base de datos anterior eliminada.")
-
+                    st.success("✅ Base de datos eliminada correctamente.")
+                else:
+                    st.info("ℹ️ No existía una base de datos previa.")
                 create_database()
-                st.success("✅ Base de datos recreada correctamente (estructura vacía).")
+                st.success("🎉 Base de datos recreada correctamente desde el esquema.")
             except Exception as e:
-                st.error(f"❌ Error al intentar reiniciar la base de datos: {e}")
-    else:
-        st.caption("✏️ Debes escribir 'BORRAR TODO' para habilitar la opción de reinicio.")
+                st.error(f"❌ Error durante el reinicio: {e}")
+        else:
+            st.error("Debe escribir exactamente **BORRAR TODO** para proceder con la eliminación.")
+
+    st.divider()
+    st.subheader("🔍 Validación de datos analíticos")
+
+    if st.button("🧠 Ejecutar análisis de datos"):
+        with st.spinner("Analizando información de la base de datos..."):
+            try:
+                resultados = validar_datos_analiticos()
+                st.success("✅ Análisis completado correctamente.")
+                st.json(resultados)
+                st.subheader("Distribución por periodo")
+                for p in resultados.get("notas_por_periodo", []):
+                    st.write(f"📅 {p['id_periodo']}: {p['count']} registros | Promedio {p['mean']:.2f}")
+            except Exception as e:
+                st.error(f"❌ Error durante el análisis: {e}")
+
+    st.caption("Versión del módulo: Hito 8.0 – Mantenimiento con reinicio seguro y validación analítica")
