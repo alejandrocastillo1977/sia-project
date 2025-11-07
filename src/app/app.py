@@ -12,6 +12,7 @@ st.set_page_config(
 from Cargue import mostrar_cargue
 from Tablero import mostrar_tablero
 from Consulta import mostrar_consulta
+from Admin import mostrar_admin  # 👈 Nuevo módulo agregado
 
 # ---- ESTILOS PERSONALIZADOS ----
 st.markdown("""
@@ -37,11 +38,18 @@ st.sidebar.title("📚 Módulos SIA")
 
 modulo = st.sidebar.radio(
     "Selecciona una opción:",
-    ["Inicio", "Cargue ARGOS", "Tablero general", "Consulta estudiante", "Reportes por umbral"],
+    [
+        "Inicio",
+        "Cargue ARGOS",
+        "Tablero general",
+        "Consulta estudiante",
+        "Reportes por umbral",
+        "⚙️ Mantenimiento"  # 👈 Nueva opción visible en menú lateral
+    ],
 )
 
 st.sidebar.markdown("---")
-st.sidebar.caption("Versión prototipo v1.1 – Hito 7")
+st.sidebar.caption("Versión prototipo v1.2 – Hito 8")
 
 # ---- ENCABEZADO ----
 st.title("🎓 Sistema de Inteligencia Académica – UNIMINUTO")
@@ -63,3 +71,6 @@ elif modulo == "Consulta estudiante":
 elif modulo == "Reportes por umbral":
     st.subheader("📈 Reportes por umbral de avance")
     st.caption("Implementación prevista para el Hito 9.")
+
+elif modulo == "⚙️ Mantenimiento":  # 👈 Nuevo bloque de mantenimiento
+    mostrar_admin()
