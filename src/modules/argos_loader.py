@@ -1,15 +1,13 @@
-import os
 import sqlite3
 import pandas as pd
 from io import BytesIO
-
 from modules.validators import resumen_validacion
-from database.upsert import upsert_inscripcion, registrar_evento
+from database.upsert import upsert_inscripcion, upsert_curso, registrar_evento
 from database.db_init import DB_PATH
 
 
 # -------------------------------------------------
-# CARGA Y VALIDACIÓN DEL EXCEL
+# CARGA Y VALIDACIÓN DEL EXCEL ARGOS
 # -------------------------------------------------
 def cargar_y_validar_excel(file_buffer: BytesIO):
     """
@@ -37,13 +35,10 @@ def cargar_y_validar_excel(file_buffer: BytesIO):
 
 
 # -------------------------------------------------
-# PROCESAMIENTO SIMULADO (para modo de prueba)
+# PROCESAMIENTO SIMULADO (modo de prueba)
 # -------------------------------------------------
 def procesar_argos(df: pd.DataFrame):
-    """
-    Simula el procesamiento del archivo ARGOS sin afectar la base de datos.
-    Retorna métricas de ejemplo coherentes con el tamaño del dataset.
-    """
+    """Simula métricas de procesamiento."""
     total = len(df)
     nuevos = int(total * 0.6)
     actualizados = int(total * 0.35)
@@ -57,15 +52,15 @@ def procesar_argos(df: pd.DataFrame):
 
 
 # -------------------------------------------------
-# CARGUE REAL A LA BASE DE DATOS (con 1 sola conexión)
+# CARGUE REAL A LA BASE DE DATOS
 # -------------------------------------------------
 def cargar_a_bd(df: pd.DataFrame):
     """
     Inserta/actualiza datos en:
       - Estudiante
-      - Curso
+      - Curso (incluye código alfanumérico: ALFA + NUMERI)
       - PeriodoAcademico
-      - Inscripcion  (vía upsert_inscripcion con la MISMA conexión)
+      - Inscripcion (con snapshot de curso)
     y registra evento en Auditoria.
     """
     total = len(df)
@@ -81,13 +76,18 @@ def cargar_a_bd(df: pd.DataFrame):
 
         for idx, fila in df.iterrows():
             try:
+                # --- Extracción de campos principales ---
                 id_estudiante = str(fila.get("ID_ESTUDIANTE", "")).strip()
                 nombre_estudiante = str(fila.get("NOMBRE_ESTUDIANTE", "Desconocido")).strip()
                 programa = str(fila.get("DESCRIPCION_PROGRAMA", "Pendiente")).strip()
-                correo = None  # No viene en ARGOS original
+                correo = None  # No viene en ARGOS
 
-                id_curso = str(fila.get("NRCS", "")).strip() or str(fila.get("ALFA", "")).strip()
-                nombre_curso = str(fila.get("DESCRIPCION", "Curso sin nombre")).strip()
+                id_curso = str(fila.get("NRCS", "")).strip()
+                # descripción puede venir como DESCRIPCION o DESCRIPION
+                nombre_curso = str(fila.get("DESCRIPCION") or fila.get("DESCRIPION") or "Curso sin nombre").strip()
+
+                alfa = str(fila.get("ALFA", "")).strip()
+                numeri = str(fila.get("NUMERI", "")).strip()
 
                 id_periodo = str(fila.get("PERIODO", "")).strip()
                 anio = int(id_periodo[:4]) if len(id_periodo) >= 4 and id_periodo[:4].isdigit() else None
@@ -99,6 +99,7 @@ def cargar_a_bd(df: pd.DataFrame):
                 except ValueError:
                     nota = 0.0
 
+                # --- Inserciones / actualizaciones ---
                 cursor.execute(
                     """
                     INSERT OR IGNORE INTO Estudiante (id_estudiante, nombre, programa, correo_institucional)
@@ -107,14 +108,10 @@ def cargar_a_bd(df: pd.DataFrame):
                     (id_estudiante, nombre_estudiante, programa, correo),
                 )
 
-                cursor.execute(
-                    """
-                    INSERT OR IGNORE INTO Curso (id_curso, nombre)
-                    VALUES (?, ?)
-                    """,
-                    (id_curso, nombre_curso),
-                )
+                # Curso (catálogo actual)
+                upsert_curso(conn, id_curso, nombre_curso, creditos=None, alfa=alfa, numeri=numeri)
 
+                # Periodo académico
                 cursor.execute(
                     """
                     INSERT OR IGNORE INTO PeriodoAcademico (id_periodo, anio, periodo)
@@ -123,19 +120,32 @@ def cargar_a_bd(df: pd.DataFrame):
                     (id_periodo, anio, periodo),
                 )
 
-                accion = upsert_inscripcion(conn, id_estudiante, id_curso, id_periodo, nota)
+                # Inscripción (con snapshot del curso)
+                accion = upsert_inscripcion(
+                    conn,
+                    id_estudiante=id_estudiante,
+                    id_curso=id_curso,
+                    id_periodo=id_periodo,
+                    nota=nota,
+                    alfa=alfa or None,
+                    numeri=numeri or None,
+                    nombre_curso=nombre_curso or None,
+                    codigo_alfanumerico=(f"{alfa} {numeri}".strip() if (alfa or numeri) else None),
+                )
                 if accion == "insertado":
                     insertados += 1
                 else:
                     actualizados += 1
 
             except Exception as e:
-                print(f"⚠️ Error procesando fila {idx}: {e}")
+                print(f"⚠️ Error procesando fila {idx + 1}: {e}")
                 errores += 1
 
-        resumen_txt = f"Cargue ARGOS – {total} registros procesados ({actualizados} actualizados, {errores} errores)"
+        resumen_txt = f"Cargue ARGOS – {total} registros procesados ({insertados} nuevos, {actualizados} actualizados, {errores} errores)"
         registrar_evento(conn, "coordinador_academico", resumen_txt)
         conn.commit()
+
+    print("📦", resumen_txt)
 
     return {
         "total": total,
@@ -143,3 +153,10 @@ def cargar_a_bd(df: pd.DataFrame):
         "actualizados": actualizados,
         "errores": errores,
     }
+
+
+# -------------------------------------------------
+# PRUEBA LOCAL
+# -------------------------------------------------
+if __name__ == "__main__":
+    print("🚀 Prueba de integración de cargue ARGOS con snapshot de curso")

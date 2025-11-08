@@ -11,13 +11,6 @@ def _connect():
 
 
 def obtener_kpis_programa() -> Dict[str, Any]:
-    """
-    Retorna KPIs globales del programa:
-      - total_estudiantes
-      - promedio_general (promedio de 'nota' sobre Inscripcion)
-      - total_cursos
-      - total_inscripciones
-    """
     with _connect() as conn:
         cur = conn.cursor()
 
@@ -43,9 +36,6 @@ def obtener_kpis_programa() -> Dict[str, Any]:
 
 
 def listar_estudiantes(limit: int = 200) -> List[Dict[str, Any]]:
-    """
-    Lista básica de estudiantes para el tablero.
-    """
     with _connect() as conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
@@ -63,15 +53,11 @@ def listar_estudiantes(limit: int = 200) -> List[Dict[str, Any]]:
 
 
 def buscar_estudiantes(query: str, limit: int = 50) -> List[Dict[str, Any]]:
-    """
-    Búsqueda por ID exacto o nombre contiene (case-insensitive).
-    """
     q = (query or "").strip()
     with _connect() as conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         if q.isdigit():
-            # prioriza coincidencia por ID
             cur.execute("""
                 SELECT e.id_estudiante,
                        COALESCE(NULLIF(TRIM(e.nombre), ''), 'Desconocido') AS nombre,
@@ -98,33 +84,32 @@ def buscar_estudiantes(query: str, limit: int = 50) -> List[Dict[str, Any]]:
 
 def historial_estudiante(id_estudiante: str) -> List[Dict[str, Any]]:
     """
-    Retorna el historial académico (inscripciones) de un estudiante con joins a Curso y PeriodoAcademico.
+    Historial del estudiante con preferencia por el snapshot de Inscripcion.
     """
     with _connect() as conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         cur.execute("""
-            SELECT i.id_periodo,
-                   p.anio,
-                   p.periodo,
-                   i.id_curso,
-                   c.nombre AS nombre_curso,
-                   i.nota,
-                   i.version_periodo
+            SELECT 
+                i.id_periodo,
+                p.anio,
+                p.periodo,
+                i.id_curso AS nrc,
+                COALESCE(NULLIF(TRIM(i.codigo_alfanumerico), ''), c.codigo_alfanumerico) AS codigo_curso,
+                COALESCE(NULLIF(TRIM(i.nombre_curso), ''), c.nombre) AS nombre_curso,
+                i.nota,
+                i.version_periodo
             FROM Inscripcion i
             LEFT JOIN Curso c ON c.id_curso = i.id_curso
             LEFT JOIN PeriodoAcademico p ON p.id_periodo = i.id_periodo
             WHERE i.id_estudiante = ?
-            ORDER BY i.id_periodo DESC, i.id_curso;
+            ORDER BY i.id_periodo ASC, i.id_curso;
         """, (id_estudiante,))
         rows = cur.fetchall()
     return [dict(r) for r in rows]
 
 
 def datos_estudiante(id_estudiante: str) -> Optional[Dict[str, Any]]:
-    """
-    Datos de cabecera del estudiante.
-    """
     with _connect() as conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
@@ -140,89 +125,102 @@ def datos_estudiante(id_estudiante: str) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 
-def obtener_notas_por_umbral(tipo: str, periodo: str, umbral: float = 3.0) -> list[dict]:
+from database.db_init import DB_PATH
+
+def obtener_notas_por_umbral(tipo: str, id_periodo: str, umbral: float):
     """
-    Retorna los estudiantes con notas bajo o sobre un umbral definido.
-    tipo: "bajo" (< umbral) o "alto" (>= umbral)
-    periodo: id_periodo a analizar (por ejemplo '202507')
+    Retorna inscripciones por umbral, prefiriendo snapshot de Inscripcion.
     """
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
     operador = "<" if tipo == "bajo" else ">="
+
     query = f"""
-        SELECT e.id_estudiante,
-               e.nombre,
-               e.programa,
-               i.id_curso,
-               c.nombre AS nombre_curso,
-               i.nota,
-               i.version_periodo
+        SELECT 
+            e.id_estudiante,
+            e.nombre,
+            e.programa,
+            i.id_curso,
+            COALESCE(NULLIF(TRIM(i.codigo_alfanumerico), ''), c.codigo_alfanumerico) AS codigo_alfanumerico,
+            COALESCE(NULLIF(TRIM(i.nombre_curso), ''), c.nombre) AS nombre_curso,
+            i.nota,
+            i.version_periodo,
+            i.id_periodo
         FROM Inscripcion i
-        JOIN Estudiante e ON e.id_estudiante = i.id_estudiante
-        JOIN Curso c ON c.id_curso = i.id_curso
-        WHERE i.id_periodo = ? AND i.nota {operador} ?
-        ORDER BY i.nota ASC;
+        JOIN Estudiante e ON i.id_estudiante = e.id_estudiante
+        LEFT JOIN Curso c ON i.id_curso = c.id_curso
+        WHERE i.id_periodo = ?
+          AND i.nota {operador} ?
+        ORDER BY e.nombre ASC;
     """
-    with _connect() as conn:
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        cur.execute(query, (periodo, umbral))
-        rows = cur.fetchall()
-    return [dict(r) for r in rows]
+
+    cursor.execute(query, (id_periodo, umbral))
+    resultados = cursor.fetchall()
+
+    df = [dict(row) for row in resultados]
+    conn.close()
+    return df
 
 
 def listar_periodos() -> list[str]:
-    """Devuelve todos los periodos registrados en la BD."""
     with _connect() as conn:
         cur = conn.cursor()
         cur.execute("SELECT DISTINCT id_periodo FROM PeriodoAcademico ORDER BY id_periodo DESC;")
         rows = [r[0] for r in cur.fetchall()]
     return rows
+# --- Auditoría: listar eventos ---
+from typing import Optional, List, Dict, Any
 
+# --- Auditoría: listar eventos ---
+from typing import Optional, List, Dict, Any
 
-# -------------------------------------------------
-# FUNCIONES ANALÍTICAS (Hito 8 – Umbrales)
-# -------------------------------------------------
-
-def listar_periodos() -> list[str]:
+def listar_eventos_auditoria(
+    limit: int = 500,
+    usuario: Optional[str] = None,   # filtro específico por usuario (substring)
+    desde: Optional[str] = None,     # 'YYYY-MM-DD' o 'YYYY-MM-DD HH:MM:SS'
+    hasta: Optional[str] = None,     # 'YYYY-MM-DD' o 'YYYY-MM-DD HH:MM:SS'
+    filtro: Optional[str] = None     # 🔹 NUEVO: búsqueda libre en usuario/accion
+) -> List[Dict[str, Any]]:
     """
-    Devuelve todos los periodos académicos registrados en la base de datos.
+    Devuelve eventos de la tabla Auditoria con filtros opcionales.
+    - usuario: substring case-insensitive en la columna 'usuario'
+    - filtro:  substring case-insensitive que busca en 'usuario' o 'accion'
+    - desde/hasta: se comparan con datetime(fecha_evento)
+    - limit: tope de filas
     """
-    with _connect() as conn:
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT DISTINCT id_periodo
-            FROM PeriodoAcademico
-            ORDER BY id_periodo DESC;
-        """)
-        rows = [r[0] for r in cur.fetchall()]
-    return rows
-
-
-def obtener_notas_por_umbral(tipo: str, periodo: str, umbral: float = 3.0) -> list[dict]:
-    """
-    Retorna los estudiantes con notas bajo o sobre un umbral definido.
-      tipo: "bajo" (< umbral) o "alto" (>= umbral)
-      periodo: ID del periodo académico (por ejemplo '202507')
-    """
-    operador = "<" if tipo == "bajo" else ">="
-    query = f"""
-        SELECT e.id_estudiante,
-               e.nombre,
-               e.programa,
-               i.id_curso,
-               c.nombre AS nombre_curso,
-               i.nota,
-               i.version_periodo
-        FROM Inscripcion i
-        JOIN Estudiante e ON e.id_estudiante = i.id_estudiante
-        JOIN Curso c ON c.id_curso = i.id_curso
-        WHERE i.id_periodo = ? AND i.nota {operador} ?
-        ORDER BY i.nota ASC;
-    """
-
     with _connect() as conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
-        cur.execute(query, (periodo, umbral))
-        rows = cur.fetchall()
-    return [dict(r) for r in rows]
 
+        sql = """
+            SELECT id_evento, usuario, accion, fecha_evento
+            FROM Auditoria
+            WHERE 1=1
+        """
+        params: list[Any] = []
+
+        if usuario:
+            sql += " AND UPPER(usuario) LIKE '%' || UPPER(?) || '%'"
+            params.append(usuario)
+
+        if filtro:
+            sql += " AND (UPPER(usuario) LIKE '%' || UPPER(?) || '%' OR UPPER(accion) LIKE '%' || UPPER(?) || '%')"
+            params.extend([filtro, filtro])
+
+        if desde:
+            sql += " AND datetime(fecha_evento) >= datetime(?)"
+            params.append(desde)
+
+        if hasta:
+            sql += " AND datetime(fecha_evento) <= datetime(?)"
+            params.append(hasta)
+
+        sql += " ORDER BY datetime(fecha_evento) DESC LIMIT ?"
+        params.append(int(limit))
+
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+
+    return [dict(r) for r in rows]

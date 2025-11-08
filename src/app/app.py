@@ -13,7 +13,9 @@ from Cargue import mostrar_cargue
 from Tablero import mostrar_tablero
 from Consulta import mostrar_consulta
 from Admin import mostrar_admin
-from Umbrales import mostrar_umbrales  # 👈 Nuevo módulo de análisis por umbrales
+from Umbrales import mostrar_umbrales
+from Auditoria import mostrar_auditoria  # 👈 Nuevo módulo agregado
+from Home import main as mostrar_inicio
 
 # ---- ESTILOS PERSONALIZADOS ----
 st.markdown("""
@@ -48,20 +50,20 @@ modulo = st.sidebar.radio(
         "Tablero general",
         "Consulta estudiante",
         "Reportes por umbral",
+        "🧾 Auditoría del sistema",  # 👈 Nueva opción visible en el menú
         "⚙️ Mantenimiento"
     ],
 )
 
 st.sidebar.markdown("---")
-st.sidebar.caption("Versión prototipo v1.2.2 – Hito 8 (Umbrales y Mantenimiento)")
+st.sidebar.caption("Versión v1.3.0 – Hito 9 (Exportes, Reportes y Auditoría)")
 
 # ---- ENCABEZADO ----
 st.title("🎓 Sistema de Inteligencia Académica – UNIMINUTO")
 
 # ---- RUTEO ENTRE MÓDULOS ----
 if modulo == "Inicio":
-    st.subheader("🏠 Inicio")
-    st.write("Bienvenido al Sistema de Inteligencia Académica (SIA). Usa el menú lateral para navegar por los módulos disponibles.")
+    mostrar_inicio()
 
 elif modulo == "Cargue ARGOS":
     mostrar_cargue()
@@ -73,9 +75,10 @@ elif modulo == "Consulta estudiante":
     mostrar_consulta()
 
 elif modulo == "Reportes por umbral":
-    mostrar_umbrales()  # 👈 Conecta el nuevo módulo de visualización analítica
+    mostrar_umbrales()
+
+elif modulo == "🧾 Auditoría del sistema":
+    mostrar_auditoria()  # 👈 Conecta el nuevo módulo
 
 elif modulo == "⚙️ Mantenimiento":
-    mostrar_admin()  # 👈 Mantiene el módulo de administración y diagnóstico
-
-
+    mostrar_admin()

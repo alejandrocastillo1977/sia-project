@@ -1,8 +1,10 @@
 -- ========================================
--- SIA Database Schema (v0.1)
--- Fecha: 2025-11-01
+-- SIA Database Schema (v0.3)
+-- Fecha: 2025-11-08
 -- Autor: Coordinador del Proyecto SIA
 -- ========================================
+
+PRAGMA foreign_keys = ON;
 
 -- Tabla: Estudiante
 CREATE TABLE IF NOT EXISTS Estudiante (
@@ -13,11 +15,12 @@ CREATE TABLE IF NOT EXISTS Estudiante (
     fecha_registro TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabla: Curso
+-- Tabla: Curso (catálogo actual)
 CREATE TABLE IF NOT EXISTS Curso (
-    id_curso TEXT PRIMARY KEY,
+    id_curso TEXT PRIMARY KEY,       -- NRC
     nombre TEXT NOT NULL,
-    creditos INTEGER
+    creditos INTEGER,
+    codigo_alfanumerico TEXT         -- ALFA + NUMERI (forma visible)
 );
 
 -- Tabla: PeriodoAcademico
@@ -28,17 +31,31 @@ CREATE TABLE IF NOT EXISTS PeriodoAcademico (
 );
 
 -- Tabla: Inscripcion (relación estudiante-curso-periodo)
+-- v0.3: agrega snapshot del curso (alfa, numeri, codigo_alfanumerico, nombre_curso)
 CREATE TABLE IF NOT EXISTS Inscripcion (
     id_inscripcion INTEGER PRIMARY KEY AUTOINCREMENT,
-    id_estudiante TEXT,
-    id_curso TEXT,
-    id_periodo TEXT,
+    id_estudiante TEXT NOT NULL,
+    id_curso TEXT NOT NULL,
+    id_periodo TEXT NOT NULL,
     nota REAL,
     version_periodo INTEGER DEFAULT 1,
-    FOREIGN KEY (id_estudiante) REFERENCES Estudiante(id_estudiante),
+
+    -- Snapshot del curso al momento del cargue (inmutable por defecto)
+    alfa TEXT,
+    numeri TEXT,
+    codigo_alfanumerico TEXT,
+    nombre_curso TEXT,
+
+    FOREIGN KEY (id_estudiante) REFERENCES Estudiante(id_estudiante) ON DELETE CASCADE,
     FOREIGN KEY (id_curso) REFERENCES Curso(id_curso),
     FOREIGN KEY (id_periodo) REFERENCES PeriodoAcademico(id_periodo)
 );
+
+-- Índices útiles
+CREATE INDEX IF NOT EXISTS idx_insc_est ON Inscripcion(id_estudiante);
+CREATE INDEX IF NOT EXISTS idx_insc_per ON Inscripcion(id_periodo);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_insc_clave
+    ON Inscripcion(id_estudiante, id_curso, id_periodo);
 
 -- Tabla: Auditoria
 CREATE TABLE IF NOT EXISTS Auditoria (
