@@ -62,11 +62,15 @@ def cargar_a_bd(df: pd.DataFrame):
       - PeriodoAcademico
       - Inscripcion (con snapshot de curso)
     y registra evento en Auditoria.
+
+    🔸 Ahora también procesa cursos con NRCS == 'TRANSFERENCIA'
+    asignándoles un NRC simbólico 'TRANSF-{ALFA}{NUMERI}'.
     """
     total = len(df)
     insertados = 0
     actualizados = 0
     errores = 0
+    transferencias = 0
 
     df = df.copy()
     df.columns = df.columns.str.upper()
@@ -82,13 +86,19 @@ def cargar_a_bd(df: pd.DataFrame):
                 programa = str(fila.get("DESCRIPCION_PROGRAMA", "Pendiente")).strip()
                 correo = None  # No viene en ARGOS
 
-                id_curso = str(fila.get("NRCS", "")).strip()
-                # descripción puede venir como DESCRIPCION o DESCRIPION
-                nombre_curso = str(fila.get("DESCRIPCION") or fila.get("DESCRIPION") or "Curso sin nombre").strip()
-
+                nrc_valor = str(fila.get("NRCS", "")).strip().upper()
                 alfa = str(fila.get("ALFA", "")).strip()
                 numeri = str(fila.get("NUMERI", "")).strip()
+                nombre_curso = str(fila.get("DESCRIPCION") or fila.get("DESCRIPION") or "Curso sin nombre").strip()
 
+                # --- Detección de cursos de transferencia ---
+                if nrc_valor == "TRANSFERENCIA":
+                    id_curso = f"TRANSF-{alfa}{numeri or 'GEN'}"
+                    transferencias += 1
+                else:
+                    id_curso = nrc_valor
+
+                # --- Periodo y nota ---
                 id_periodo = str(fila.get("PERIODO", "")).strip()
                 anio = int(id_periodo[:4]) if len(id_periodo) >= 4 and id_periodo[:4].isdigit() else None
                 periodo = int(id_periodo[4:]) if len(id_periodo) > 4 and id_periodo[4:].isdigit() else None
@@ -132,6 +142,7 @@ def cargar_a_bd(df: pd.DataFrame):
                     nombre_curso=nombre_curso or None,
                     codigo_alfanumerico=(f"{alfa} {numeri}".strip() if (alfa or numeri) else None),
                 )
+
                 if accion == "insertado":
                     insertados += 1
                 else:
@@ -141,7 +152,11 @@ def cargar_a_bd(df: pd.DataFrame):
                 print(f"⚠️ Error procesando fila {idx + 1}: {e}")
                 errores += 1
 
-        resumen_txt = f"Cargue ARGOS – {total} registros procesados ({insertados} nuevos, {actualizados} actualizados, {errores} errores)"
+        resumen_txt = (
+            f"Cargue ARGOS – {total} registros procesados "
+            f"({insertados} nuevos, {actualizados} actualizados, {errores} errores, "
+            f"{transferencias} cursos por transferencia)"
+        )
         registrar_evento(conn, "coordinador_academico", resumen_txt)
         conn.commit()
 
@@ -152,6 +167,7 @@ def cargar_a_bd(df: pd.DataFrame):
         "nuevos": insertados,
         "actualizados": actualizados,
         "errores": errores,
+        "transferencias": transferencias,
     }
 
 
@@ -159,4 +175,4 @@ def cargar_a_bd(df: pd.DataFrame):
 # PRUEBA LOCAL
 # -------------------------------------------------
 if __name__ == "__main__":
-    print("🚀 Prueba de integración de cargue ARGOS con snapshot de curso")
+    print("🚀 Prueba de integración de cargue ARGOS con soporte de TRANSFERENCIAS")
