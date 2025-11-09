@@ -11,7 +11,7 @@ data/*.db
 # Ignorar configuración interna de Streamlit
 .streamlit/
 
-# Reportes y respaldos locales
+    # Reportes y respaldos locales
 exports/
 backups/
 
