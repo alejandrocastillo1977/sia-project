@@ -8,8 +8,14 @@ st.set_page_config(
     layout="wide",
 )
 
-# ---- IMPORTACIÓN DE MÓDULOS ----
+# ---- IMPORTACIÓN DE MÓDULOS PRINCIPALES ----
 from Cargue import mostrar_cargue
+from Tablero import mostrar_tablero
+from Consulta import mostrar_consulta
+from Admin import mostrar_admin
+from Umbrales import mostrar_umbrales
+from Auditoria import mostrar_auditoria  # 👈 Nuevo módulo agregado
+from Home import main as mostrar_inicio
 
 # ---- ESTILOS PERSONALIZADOS ----
 st.markdown("""
@@ -30,34 +36,49 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---- SIDEBAR ----
-st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/2/29/Logo_uniminuto.png", width=160)
+st.sidebar.image(
+    "https://upload.wikimedia.org/wikipedia/commons/2/29/Logo_uniminuto.png",
+    width=160
+)
 st.sidebar.title("📚 Módulos SIA")
+
 modulo = st.sidebar.radio(
     "Selecciona una opción:",
-    ["Inicio", "Cargue ARGOS", "Tablero general", "Consulta estudiante", "Reportes por umbral"],
+    [
+        "Inicio",
+        "Cargue ARGOS",
+        "Tablero general",
+        "Consulta estudiante",
+        "Reportes por umbral",
+        "🧾 Auditoría del sistema",  # 👈 Nueva opción visible en el menú
+        "⚙️ Mantenimiento"
+    ],
 )
+
 st.sidebar.markdown("---")
-st.sidebar.caption("Versión prototipo v0.1")
+st.sidebar.caption("Versión v1.3.0 – Hito 9 (Exportes, Reportes y Auditoría)")
 
 # ---- ENCABEZADO ----
 st.title("🎓 Sistema de Inteligencia Académica – UNIMINUTO")
 
 # ---- RUTEO ENTRE MÓDULOS ----
 if modulo == "Inicio":
-    st.subheader("🏠 Inicio")
-    st.write("Bienvenido al SIA. Usa el menú lateral para navegar por los módulos.")
+    mostrar_inicio()
 
 elif modulo == "Cargue ARGOS":
-    mostrar_cargue()  # 👈 Aquí conectamos tu módulo real
+    mostrar_cargue()
 
 elif modulo == "Tablero general":
-    st.subheader("📊 Tablero general del programa")
-    st.caption("Próximamente en Hito 8.")
+    mostrar_tablero()
 
 elif modulo == "Consulta estudiante":
-    st.subheader("👤 Consulta individual de estudiante")
-    st.caption("Disponible en el Hito 8.")
+    mostrar_consulta()
 
 elif modulo == "Reportes por umbral":
-    st.subheader("📈 Reportes por umbral de avance")
-    st.caption("Implementación prevista para el Hito 9.")
+    mostrar_umbrales()
+
+elif modulo == "🧾 Auditoría del sistema":
+    mostrar_auditoria()  # 👈 Conecta el nuevo módulo
+
+elif modulo == "⚙️ Mantenimiento":
+    mostrar_admin()

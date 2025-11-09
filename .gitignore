@@ -10,3 +10,20 @@ data/*.db
 
 # Ignorar configuración interna de Streamlit
 .streamlit/
+
+    # Reportes y respaldos locales
+exports/
+backups/
+
+# Bases de datos y muestras locales
+data/*.db
+data/argos_samples/
+data/outputs/
+
+# Entorno virtual y cachés
+.venv/
+__pycache__/
+*.pyc
+
+# Configuración interna de Streamlit
+.streamlit/

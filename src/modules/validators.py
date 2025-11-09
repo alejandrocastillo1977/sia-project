@@ -1,16 +1,15 @@
+# src/modules/validators.py
 import pandas as pd
-import numpy as np
 from pathlib import Path
 
 # -------------------------------------------------
-# CONFIGURACIÓN
+# CONFIGURACIÓN Y ESTRUCTURA BASE ARGOS
 # -------------------------------------------------
 
-# Ruta por defecto del archivo de ejemplo (puedes cambiarla si deseas)
 RUTA_EJEMPLO = Path("data/argos_samples/ejemplo_argos.xlsx")
 
-# Columnas oficiales del formato ARGOS A–W (según documento de modelado de datos)
-COLUMNAS_ARGOS = [
+# Layout esperado ARGOS (A–W) usando NOMBRES CANÓNICOS
+LAYOUT_ARGOS = [
     "ID_ESTUDIANTE", "NOMBRE_ESTUDIANTE", "RECTORIA", "DESCRIPCION_RECTORIA",
     "SEDE", "DESCRIPCION_SEDE", "FACULTAD", "DESCRIPCION_FACULTAD",
     "PROGRAMA", "DESCRIPCION_PROGRAMA", "NIVEL", "DESCRIPCION_NIVEL",
@@ -18,85 +17,108 @@ COLUMNAS_ARGOS = [
     "DEFINITIVA", "PROMEDIO_SEM", "PROM_ACU", "FORMA_CAL", "COMENTARIO"
 ]
 
-# -------------------------------------------------
-# FUNCIONES PRINCIPALES
-# -------------------------------------------------
+# Mapa de posiciones críticas (A–W indexadas desde 0)
+POSICIONES_CLAVE = {
+    13: "PERIODO",
+    14: "NRCS",
+    15: "ALFA",
+    16: "NUMERI",
+    17: "DESCRIPCION",
+    18: "DEFINITIVA"
+}
+
+# Alias frecuentes -> nombre canónico
+EQUIVALENCIAS = {
+    "FACULTA": "FACULTAD",
+    "DESCRIPION": "DESCRIPCION",
+    "DESCRIPCION_ASIGNATURA": "DESCRIPCION",
+    "ALFA_NUMERI": "NRCS",
+    "NOMBRE": "NOMBRE_ESTUDIANTE",
+}
+
 
 def resumen_validacion(df: pd.DataFrame) -> dict:
     """
-    Valida columnas, tipos de nota y formato de periodo según estructura ARGOS.
-    Incluye detección de errores comunes en encabezados y valores.
+    Valida estructura híbrida (por nombre y posición).
+    - Detecta errores de encabezado.
+    - Repara alias comunes.
+    - Evalúa notas, periodos y duplicados.
     """
-    # Normalizar encabezados
+    # Debug: encabezados crudos tal como llegan desde pandas
+    print("🧾 [RAW] Encabezados detectados por pandas:", df.columns.tolist())
+
+    # Normalizar nombres
     df.columns = df.columns.str.strip().str.upper()
+    df.rename(columns=EQUIVALENCIAS, inplace=True)
 
-    # Sinónimos y errores frecuentes en los reportes ARGOS
-    equivalencias = {
-        "FACULTA": "FACULTAD",
-        "DESCRIPCION_ASIGNATURA": "DESCRIPCION",
-        "DESCRIPION": "DESCRIPCION",    # error tipográfico frecuente en ARGOS
-        "ASIGNATURA": "DESCRIPCION",
-        "NOMBRE": "NOMBRE_ESTUDIANTE",
-        "ALFA_NUMERI": "NRCS"           # algunos reportes combinan ambos
-    }
-    df.rename(columns=equivalencias, inplace=True)
+    # Debug: encabezados ya normalizados/canónicos
+    print("🧾 [NORM] Encabezados normalizados:", df.columns.tolist())
 
-    # --- 1️⃣ Validación de columnas ---
-    columnas_presentes = set(df.columns)
-    columnas_requeridas = set(COLUMNAS_ARGOS)
-    faltantes = list(columnas_requeridas - columnas_presentes)
+    # 1️⃣ Validación nominal (contra layout canónico)
+    columnas_presentes = list(df.columns)
+    faltantes = [col for col in LAYOUT_ARGOS if col not in columnas_presentes]
     columnas_validas = len(faltantes) == 0
 
-    # --- 2️⃣ Validación de notas (acepta coma, punto, texto o espacios) ---
+    # 2️⃣ Validación por posición de columnas clave
+    posicion_correcta = True
+    errores_pos = []
+    for idx, nombre_esperado in POSICIONES_CLAVE.items():
+        if idx >= len(df.columns):
+            posicion_correcta = False
+            errores_pos.append(f"Falta columna en posición {idx+1} ({nombre_esperado})")
+        elif df.columns[idx] != nombre_esperado:
+            posicion_correcta = False
+            errores_pos.append(
+                f"Columna {idx+1} esperada '{nombre_esperado}' pero se encontró '{df.columns[idx]}'"
+            )
+
+    # 3️⃣ Validación de notas
     if "DEFINITIVA" in df.columns:
         notas = (
-            df["DEFINITIVA"]
-            .astype(str)
+            df["DEFINITIVA"].astype(str)
             .str.replace(",", ".", regex=False)
-            .str.replace(r"[^0-9.\-]", "", regex=True)   # limpia símbolos, letras o guiones
+            .str.replace(r"[^0-9.\-]", "", regex=True)
             .str.strip()
         )
-
-        # Convertir a numérico y eliminar valores vacíos o inválidos
         notas_num = pd.to_numeric(notas, errors="coerce")
-
-        # Mostrar vista previa (útil para depuración)
-        print("🔎 Vista previa de notas convertidas:", notas_num.head().tolist())
-
         notas_validas = notas_num.dropna().between(0, 5, inclusive="both").all()
     else:
         notas_validas = False
 
-    # --- 3️⃣ Validación de periodos académicos ---
+    # 4️⃣ Validación de periodos (semestres/trimestres frecuentes)
     periodos_validos = (
-        df["PERIODO"].astype(str).str.match(r"^20\d{2}(05|07|13|16|18|23)$", na=False).all()
+        df["PERIODO"].astype(str).str.match(r"^20\d{2}(05|07|13|16|18|23|25|28)$", na=False).all()
         if "PERIODO" in df.columns else False
     )
 
-    # --- 4️⃣ Detección de duplicados ---
-    if all(col in df.columns for col in ["ID_ESTUDIANTE", "NRCS", "PERIODO"]):
-        duplicados = df.duplicated(subset=["ID_ESTUDIANTE", "NRCS", "PERIODO"]).any()
-    else:
-        duplicados = None
+    # 5️⃣ Duplicados (clave natural: estudiante + NRC + periodo)
+    duplicados = (
+        df.duplicated(subset=["ID_ESTUDIANTE", "NRCS", "PERIODO"]).any()
+        if all(col in df.columns for col in ["ID_ESTUDIANTE", "NRCS", "PERIODO"])
+        else None
+    )
 
-    # Resultado final
     return {
         "columnas_validas": columnas_validas,
         "faltantes": faltantes,
+        "posicion_correcta": posicion_correcta,
+        "errores_posicion": errores_pos,
         "notas_validas": notas_validas,
         "periodos_validos": periodos_validos,
         "duplicados": duplicados,
         "total_registros": len(df)
     }
 
-# -------------------------------------------------
-# EJECUCIÓN DIRECTA PARA PRUEBAS
-# -------------------------------------------------
 
+# -------------------------------------------------
+# PRUEBA LOCAL
+# -------------------------------------------------
 if __name__ == "__main__":
     if not RUTA_EJEMPLO.exists():
         print(f"⚠️ No se encontró el archivo en: {RUTA_EJEMPLO}")
     else:
         df = pd.read_excel(RUTA_EJEMPLO)
         resultado = resumen_validacion(df)
-        print("✅ Validación completada:\n", resultado)
+        print("✅ Validación híbrida completada:")
+        for k, v in resultado.items():
+            print(f"{k}: {v}")
