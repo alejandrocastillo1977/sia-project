@@ -34,3 +34,5 @@ pytest>=8.0.0
 black>=24.3.0
 ruff>=0.6.0
 
+# Exportes PDF (reporte institucional)
+reportlab>=4.0.0
