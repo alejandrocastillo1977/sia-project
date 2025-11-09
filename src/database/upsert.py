@@ -43,10 +43,14 @@ def upsert_curso(
     Inserta o actualiza un curso con su código alfanumérico.
     - id_curso: NRC (columna NRCS)
     - codigo_alfanumerico: concatenación de ALFA + NUMERI
+    Admite id_curso simbólicos como TRANSF-XXXX (transferencias).
     """
     if not id_curso:
         print("⚠️ No se puede registrar curso sin 'id_curso'.")
         return
+
+    # 🔹 Permitir NRC simbólico (transferencias)
+    id_curso = str(id_curso).strip().upper()
 
     codigo_alfanumerico = None
     alfa = (alfa or "").strip()
@@ -92,22 +96,19 @@ def upsert_inscripcion(
     """
     Inserta o actualiza una inscripción según la clave (id_estudiante, id_curso, id_periodo)
     usando la MISMA conexión.
-    - En INSERT: guarda snapshot de curso (alfa, numeri, codigo_alfanumerico, nombre_curso).
-    - En UPDATE: sólo incrementa versión y actualiza 'nota'.
-      Si el snapshot está vacío, lo completa; si ya existe, NO lo sobreescribe.
-    Retorna 'insertado' o 'actualizado'.
+
+    🔹 Ahora admite id_curso simbólicos (ej. TRANSF-ISOFV033)
+    para registrar cursos por transferencia sin NRC numérico.
     """
     cursor = conn.cursor()
 
-    # Normalización ligera
     id_estudiante = (id_estudiante or "").strip()
-    id_curso = (id_curso or "").strip()
+    id_curso = (id_curso or "").strip().upper()
     id_periodo = (id_periodo or "").strip()
 
     if not (id_estudiante and id_curso and id_periodo):
         raise ValueError("Inscripción inválida: faltan id_estudiante, id_curso o id_periodo.")
 
-    # Armar código alfanumérico si no viene
     alfa = (alfa or "").strip()
     numeri = (numeri or "").strip()
     if not codigo_alfanumerico:
@@ -132,7 +133,6 @@ def upsert_inscripcion(
         id_inscripcion, version_actual, alfa_db, numeri_db, codigo_db, nombre_db = registro
         nueva_version = (version_actual or 1) + 1
 
-        # Decidir si completar snapshot (sin sobreescribir si ya hay valor)
         set_alfa = alfa_db or alfa or None
         set_numeri = numeri_db or numeri or None
         set_codigo = codigo_db or codigo_alfanumerico or None
@@ -171,14 +171,14 @@ def upsert_inscripcion(
 
 
 # ======================================================
-# PRUEBA LOCAL (EJECUCIÓN DIRECTA)
+# PRUEBA LOCAL
 # ======================================================
 if __name__ == "__main__":
     with sqlite3.connect(DB_PATH) as conn:
-        upsert_curso(conn, "50439", "Análisis y Diseño de Software", 3, "ISOF", "V033")
+        upsert_curso(conn, "TRANSF-ISOFV033", "Transferencia de curso ISOF", 3, "ISOF", "V033")
         accion = upsert_inscripcion(
-            conn, "948997", "50439", "202413", 4.7,
-            alfa="ISOF", numeri="V033", nombre_curso="Análisis y Diseño de Software"
+            conn, "948997", "TRANSF-ISOFV033", "202413", 4.7,
+            alfa="ISOF", numeri="V033", nombre_curso="Transferencia de curso ISOF"
         )
         print("Acción:", accion)
-        registrar_evento(conn, "tester", "Prueba de auditoría y snapshot de curso")
+        registrar_evento(conn, "tester", "Prueba de curso por transferencia")

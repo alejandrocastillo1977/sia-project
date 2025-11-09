@@ -20,7 +20,8 @@ EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 def exportar_excel(df: pd.DataFrame, nombre_archivo: str = "reporte.xlsx") -> str:
     """
     Exporta un DataFrame a un archivo Excel con formato institucional.
-    Retorna la ruta absoluta del archivo generado.
+    Si existen cursos de transferencia (id_curso o NRC que inicien con 'TRANSF-'),
+    se colorean en azul claro.
     """
     ruta_salida = EXPORT_DIR / nombre_archivo
     with pd.ExcelWriter(ruta_salida, engine="xlsxwriter") as writer:
@@ -34,11 +35,24 @@ def exportar_excel(df: pd.DataFrame, nombre_archivo: str = "reporte.xlsx") -> st
             "font_color": "black",
             "align": "center"
         })
+        formato_transferencia = workbook.add_format({
+            "bg_color": "#E3F2FD"
+        })
         worksheet.set_row(0, 20, formato_header)
 
         for i, col in enumerate(df.columns):
             col_width = max(len(str(col)), int(df[col].astype(str).map(len).mean()))
             worksheet.set_column(i, i, min(col_width + 3, 40))
+
+        # 🔹 Aplicar formato a filas con cursos de transferencia
+        if "id_curso" in df.columns:
+            for row_num, valor in enumerate(df["id_curso"], start=1):
+                if str(valor).startswith("TRANSF-"):
+                    worksheet.write(row_num, list(df.columns).index("id_curso"), valor, formato_transferencia)
+        elif "nrc" in df.columns:
+            for row_num, valor in enumerate(df["nrc"], start=1):
+                if str(valor).startswith("TRANSF-"):
+                    worksheet.write(row_num, list(df.columns).index("nrc"), valor, formato_transferencia)
 
     print(f"✅ Archivo Excel generado: {ruta_salida}")
     return str(ruta_salida)
@@ -50,7 +64,7 @@ def exportar_excel(df: pd.DataFrame, nombre_archivo: str = "reporte.xlsx") -> st
 def exportar_pdf(datos: dict, nombre_archivo: str = "reporte.pdf", df: pd.DataFrame = None) -> str:
     """
     Genera un reporte PDF con formato institucional de UNIMINUTO.
-    Incluye NRC y código alfanumérico del curso.
+    Si el curso es una transferencia, se muestra con NRC = 'TRANSF'.
     """
     ruta_salida = EXPORT_DIR / nombre_archivo
     c = canvas.Canvas(str(ruta_salida), pagesize=letter)
@@ -106,6 +120,9 @@ def exportar_pdf(datos: dict, nombre_archivo: str = "reporte.pdf", df: pd.DataFr
             x = 60
             for i, col in enumerate(columnas):
                 texto = str(fila.get(col, ""))[:40]
+                # 🔹 Simplificar TRANSF
+                if col in ("nrc", "id_curso") and texto.startswith("TRANSF-"):
+                    texto = "TRANSF"
                 c.drawString(x + 5, y, texto)
                 x += anchos[i]
             y -= 14
@@ -119,5 +136,3 @@ def exportar_pdf(datos: dict, nombre_archivo: str = "reporte.pdf", df: pd.DataFr
     c.save()
     print(f"✅ Archivo PDF generado: {ruta_salida}")
     return str(ruta_salida)
-
-
