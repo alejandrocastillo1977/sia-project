@@ -1,11 +1,11 @@
 import streamlit as st
-from pathlib import Path
 
 # ---- CONFIGURACIÓN GENERAL ----
 st.set_page_config(
     page_title="SIA – Sistema de Inteligencia Académica",
     page_icon="🎓",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 # ---- IMPORTACIÓN DE MÓDULOS PRINCIPALES ----
@@ -16,21 +16,42 @@ from Admin import mostrar_admin
 from Umbrales import mostrar_umbrales
 from Auditoria import mostrar_auditoria  # 👈 Nuevo módulo agregado
 from Home import main as mostrar_inicio
+from utils.cargue_historial import obtener_historial
 
 # ---- ESTILOS PERSONALIZADOS ----
 st.markdown("""
     <style>
+        :root {
+            --color-primario: #0B2F6B;
+            --color-secundario: #FDB813;
+            --color-fondo: #F5F7FA;
+        }
         .main {
-            background-color: #f4f4f9;
+            background: linear-gradient(180deg, var(--color-fondo) 0%, #FFFFFF 40%);
         }
         h1, h2, h3 {
-            color: #0033A0;
+            color: var(--color-primario);
         }
         .stMetricValue {
-            color: #0033A0 !important;
+            color: var(--color-primario) !important;
         }
-        .sidebar .sidebar-content {
-            background-color: #ffffff;
+        .stButton button {
+            background-color: var(--color-secundario);
+            color: var(--color-primario);
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        .stButton button:hover {
+            background-color: #ffcf4d;
+            color: var(--color-primario);
+        }
+        .stRadio > label {
+            color: var(--color-primario);
+            font-weight: 600;
+        }
+        section[data-testid="stSidebar"] {
+            background-color: #FFFFFF;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -56,7 +77,27 @@ modulo = st.sidebar.radio(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.caption("Versión v1.3.0 – Hito 9 (Exportes, Reportes y Auditoría)")
+st.sidebar.caption("Versión v1.4.0 – Hito 10 (Funcionalidades actualizadas)")
+
+
+def _render_sidebar_historial(modulo_actual: str) -> None:
+    """Renderiza el historial de cargues en el panel lateral."""
+
+    if modulo_actual == "Cargue ARGOS":
+        return  # Se muestra un panel más detallado dentro del módulo
+
+    st.sidebar.markdown("### 🗂️ Últimos cargues")
+    historial = obtener_historial()
+    if not historial:
+        st.sidebar.caption("Aún no se registran cargues recientes.")
+        return
+
+    for entrada in historial:
+        st.sidebar.markdown(
+            f"**{entrada['archivo']}**  \n"
+            f"{entrada['fecha']} · {entrada['modo']} · {entrada['estado']}"
+        )
+        st.sidebar.markdown("---")
 
 # ---- ENCABEZADO ----
 st.title("🎓 Sistema de Inteligencia Académica – UNIMINUTO")
@@ -82,3 +123,5 @@ elif modulo == "🧾 Auditoría del sistema":
 
 elif modulo == "⚙️ Mantenimiento":
     mostrar_admin()
+
+_render_sidebar_historial(modulo)
