@@ -1,0 +1,15 @@
+# 🚀 Regla de inicio automático de contexto para Windsurf (SIA Project)
+# Carga las memorias técnicas principales al abrir un nuevo chat o sesión.
+
+onStart:
+  - /context clear
+  - /context add AI_MEMORY.md
+  - /context add README.md
+  - /context add CHANGELOG.md
+
+description: |
+  Esta regla asegura que, cada vez que se abre el proyecto o un nuevo chat,
+  Windsurf cargue automáticamente las tres memorias base del Sistema de Inteligencia Académica (SIA):
+  1. AI_MEMORY.md (contexto técnico central)
+  2. README.md (estructura y propósito del sistema)
+  3. CHANGELOG.md (historial y dependencias)
