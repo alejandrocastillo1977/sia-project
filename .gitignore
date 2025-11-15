@@ -1,29 +1,29 @@
-# Ignorar entorno virtual y cachés
+# -----------------------------------------
+# Entorno virtual y cachés de Python
+# -----------------------------------------
 .venv/
 __pycache__/
 *.pyc
 
-# Ignorar datos temporales
+# -----------------------------------------
+# Configuración interna de Streamlit
+# -----------------------------------------
+.streamlit/
+
+# -----------------------------------------
+# Datos temporales, salidas y bases locales
+# -----------------------------------------
 data/outputs/
 data/argos_samples/
 data/*.db
 
-# Ignorar configuración interna de Streamlit
-.streamlit/
-
-    # Reportes y respaldos locales
+# -----------------------------------------
+# Reportes y respaldos locales (no versionar)
+# -----------------------------------------
 exports/
 backups/
 
-# Bases de datos y muestras locales
-data/*.db
-data/argos_samples/
-data/outputs/
-
-# Entorno virtual y cachés
-.venv/
-__pycache__/
-*.pyc
-
-# Configuración interna de Streamlit
-.streamlit/
+# -----------------------------------------
+# Workspace de Windsurf (NO versionar)
+# -----------------------------------------
+sia-project_workspace.code-workspace
