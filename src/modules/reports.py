@@ -243,7 +243,6 @@ def exportar_pdf_malla(
     # Encabezados y anchos ajustados
     c.setFont("Helvetica-Bold", 10)
     encabezados = ["Cuat.", "Código", "Curso", "Créd.", "Estado", "Nota", "Periodo"]
-    # Aumentamos ancho de ESTADO y un poco de CURSO
     anchos = [35, 65, 200, 35, 70, 35, 55]
 
     def _dibujar_header(fy: float) -> float:
@@ -254,16 +253,16 @@ def exportar_pdf_malla(
             x += anchos[i]
         fy -= 12
         c.line(60, fy, width - 60, fy)
-        return fy - 8
+        return fy - 10  # un poco más de espacio bajo el encabezado
 
     y = _dibujar_header(y)
 
     # Colores más fuertes por estado (fondo)
     colores_estado = {
-        "APROBADO": colors.Color(0.75, 0.90, 0.75),       # verde más marcado
-        "PERDIDO": colors.Color(0.98, 0.75, 0.75),        # rojo más marcado
-        "TRANSFERENCIA": colors.Color(0.70, 0.82, 0.97),  # azul más marcado
-        "PENDIENTE": colors.Color(0.90, 0.90, 0.90),      # gris más visible
+        "APROBADO": colors.Color(0.75, 0.90, 0.75),
+        "PERDIDO": colors.Color(0.98, 0.75, 0.75),
+        "TRANSFERENCIA": colors.Color(0.70, 0.82, 0.97),
+        "PENDIENTE": colors.Color(0.90, 0.90, 0.90),
     }
 
     c.setFont("Helvetica", 9)
@@ -279,14 +278,14 @@ def exportar_pdf_malla(
             estado = str(curso.get("estado", "")).upper()
             bg_color = colores_estado.get(estado, colors.white)
 
-            # Fila coloreada por estado
-            fila_altura = 16  # 🔹 más alto para no "morder" texto
+            # --- Fila coloreada y más alta ---
+            fila_altura = 20  # altura más grande para no morder texto
+            y_texto = y - 5   # bajamos un poco la línea base del texto
             c.setFillColor(bg_color)
-            c.rect(60, y - 3, sum(anchos), fila_altura + 3, stroke=0, fill=1)
+            c.rect(60, y - fila_altura + 2, sum(anchos), fila_altura, stroke=0, fill=1)
             c.setFillColor(colors.black)
 
             x = 60
-            # Descripciones cortas de estado para evitar desbordes
             estado_print = {
                 "APROBADO": "APR",
                 "PERDIDO": "PER",
@@ -305,8 +304,9 @@ def exportar_pdf_malla(
             ]
 
             for i, val in enumerate(fila_vals):
-                c.drawString(x + 2, y, str(val))
+                c.drawString(x + 2, y_texto, str(val))
                 x += anchos[i]
+
             y -= fila_altura
 
     c.setFont("Helvetica-Oblique", 9)
