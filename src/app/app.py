@@ -16,10 +16,12 @@ from Admin import mostrar_admin
 from Umbrales import mostrar_umbrales
 from Auditoria import mostrar_auditoria  # 👈 Nuevo módulo agregado
 from Home import main as mostrar_inicio
+from Malla import mostrar_malla          # 👈 NUEVO: módulo de malla curricular
 from utils.cargue_historial import obtener_historial
 
 # ---- ESTILOS PERSONALIZADOS ----
-st.markdown("""
+st.markdown(
+    """
     <style>
         :root {
             --color-primario: #0B2F6B;
@@ -54,12 +56,14 @@ st.markdown("""
             background-color: #FFFFFF;
         }
     </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # ---- SIDEBAR ----
 st.sidebar.image(
     "https://upload.wikimedia.org/wikipedia/commons/2/29/Logo_uniminuto.png",
-    width=160
+    width=160,
 )
 st.sidebar.title("📚 Módulos SIA")
 
@@ -70,9 +74,10 @@ modulo = st.sidebar.radio(
         "Cargue ARGOS",
         "Tablero general",
         "Consulta estudiante",
+        "Malla curricular",          # 👈 NUEVO
         "Reportes por umbral",
         "🧾 Auditoría del sistema",  # 👈 Nueva opción visible en el menú
-        "⚙️ Mantenimiento"
+        "⚙️ Mantenimiento",
     ],
 )
 
@@ -99,6 +104,7 @@ def _render_sidebar_historial(modulo_actual: str) -> None:
         )
         st.sidebar.markdown("---")
 
+
 # ---- ENCABEZADO ----
 st.title("🎓 Sistema de Inteligencia Académica – UNIMINUTO")
 
@@ -115,11 +121,14 @@ elif modulo == "Tablero general":
 elif modulo == "Consulta estudiante":
     mostrar_consulta()
 
+elif modulo == "Malla curricular":
+    mostrar_malla()
+
 elif modulo == "Reportes por umbral":
     mostrar_umbrales()
 
 elif modulo == "🧾 Auditoría del sistema":
-    mostrar_auditoria()  # 👈 Conecta el nuevo módulo
+    mostrar_auditoria()
 
 elif modulo == "⚙️ Mantenimiento":
     mostrar_admin()
