@@ -128,7 +128,7 @@ elif modulo == "Reportes por umbral":
     mostrar_umbrales()
 
 elif modulo == "🧾 Auditoría del sistema":
-    mostrar_auditoria()  # 👈 Conecta el nuevo módulo
+    mostrar_auditoria()
 
 elif modulo == "⚙️ Mantenimiento":
     mostrar_admin()

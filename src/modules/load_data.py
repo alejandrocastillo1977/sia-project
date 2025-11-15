@@ -206,7 +206,9 @@ def _estado_global_curso(registros: List[Dict[str, Any]]) -> Dict[str, Any]:
             mejor_estado = estado
             mejor_registro = reg
         elif prioridad.get(estado, 0) == prioridad.get(mejor_estado, 0):
-            if mejor_registro is None or str(reg.get("id_periodo", "")) > str(mejor_registro.get("id_periodo", "")):
+            if mejor_registro is None or str(reg.get("id_periodo", "")) > str(
+                mejor_registro.get("id_periodo", "")
+            ):
                 mejor_registro = reg
 
     if mejor_registro is None:
@@ -228,7 +230,7 @@ def mapear_malla_con_historico(
     Parameters
     ----------
     historial:
-        Lista de dicts tal como la retorna `database.queries.historial_estudiante`.
+        Lista de dicts tal como la retorna [database.queries.historial_estudiante](cci:1://file:///d:/sia-project/src/database/queries.py:84:0-108:34).
     malla:
         Estructura de malla. Si es None, se usa la malla embebida de Ingeniería de Software.
 
