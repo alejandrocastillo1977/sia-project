@@ -110,14 +110,29 @@ def mostrar_malla():
     # --- Resumen de créditos por estado (para encabezados y PDF) ---
     resumen_creditos = _resumen_creditos(cruce)
     total_creditos = sum(resumen_creditos.values())
+
+    # Cred/aprob/transf = APR + TRANSF
     cred_aprob_transf = resumen_creditos["APROBADO"] + resumen_creditos["TRANSFERENCIA"]
-    porc_malla = (cred_aprob_transf / total_creditos * 100) if total_creditos > 0 else 0.0
+    # Créditos pendientes = PEND, Créditos perdidos = PER
+    cred_pend = resumen_creditos["PENDIENTE"]
+    cred_perd = resumen_creditos["PERDIDO"]
+
+    # Porc/aproba_malla = (Cred/aprob/transf * 100) / Créditos totales malla
+    porc_aproba = (
+        (cred_aprob_transf * 100.0 / total_creditos) if total_creditos > 0 else 0.0
+    )
+    # Porc/pendie_malla = 100% - Porc/aproba_malla
+    porc_pendie = 100.0 - porc_aproba if total_creditos > 0 else 0.0
 
     col_res1, col_res2, col_res3, col_res4 = st.columns(4)
     col_res1.metric("Cred/aprob/transf", cred_aprob_transf)
-    col_res2.metric("Créditos pendientes", resumen_creditos["PENDIENTE"])
-    col_res3.metric("Créditos perdidos", resumen_creditos["PERDIDO"])
-    col_res4.metric("Porc/aproba_malla", f"{porc_malla:.1f} %")
+    col_res2.metric("Créditos pendientes", cred_pend)
+    col_res3.metric("Créditos perdidos", cred_perd)
+    col_res4.metric("Porc/aproba_malla", f"{porc_aproba:.1f} %")
+
+    # Segunda fila para mostrar Porc/pendie_malla de forma clara
+    col_pendie, _, _, _ = st.columns(4)
+    col_pendie.metric("Porc/pendie_malla", f"{porc_pendie:.1f} %")
 
     # --- Detalle por cuatrimestre ---
     for bloque in cruce:
@@ -167,8 +182,10 @@ def mostrar_malla():
                 "Programa": ficha.get("programa", "N/D"),
                 "Créditos totales malla": total_creditos,
                 "Cred/aprob/transf": cred_aprob_transf,
-                "Porc/aproba_malla": f"{porc_malla:.1f} %",
-                "Créditos pendientes": resumen_creditos["PENDIENTE"],
+                "Créditos pendientes": cred_pend,
+                "Créditos perdidos": cred_perd,
+                "Porc/aproba_malla": f"{porc_aproba:.1f} %",
+                "Porc/pendie_malla": f"{porc_pendie:.1f} %",
             }
             nombre_pdf = f"malla_{id_est}_{nombre_est}_{timestamp}.pdf"
             ruta_pdf = exportar_pdf_malla(datos_pdf, cruce, nombre_pdf)
