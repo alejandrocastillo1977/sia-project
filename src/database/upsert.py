@@ -37,7 +37,7 @@ def upsert_curso(
     nombre: str,
     creditos: int = None,
     alfa: str = None,
-    numeri: str = None
+    numeri: str = None,
 ) -> None:
     """
     Inserta o actualiza un curso con su código alfanumérico.
@@ -79,7 +79,7 @@ def upsert_curso(
 
 
 # ======================================================
-# FUNCIÓN: UPSERT INSCRIPCIÓN (con snapshot del curso)
+# FUNCIÓN: UPSERT INSCRIPCIÓN (con snapshot del curso y programa)
 # ======================================================
 def upsert_inscripcion(
     conn: sqlite3.Connection,
@@ -92,13 +92,15 @@ def upsert_inscripcion(
     numeri: str | None = None,
     nombre_curso: str | None = None,
     codigo_alfanumerico: str | None = None,
+    programa: str | None = None,
+    descripcion_programa: str | None = None,
 ) -> str:
     """
     Inserta o actualiza una inscripción según la clave (id_estudiante, id_curso, id_periodo)
     usando la MISMA conexión.
 
-    🔹 Ahora admite id_curso simbólicos (ej. TRANSF-ISOFV033)
-    para registrar cursos por transferencia sin NRC numérico.
+    🔹 Ahora también guarda un snapshot del programa (programa, descripcion_programa)
+    junto con el snapshot del curso.
     """
     cursor = conn.cursor()
 
@@ -111,6 +113,9 @@ def upsert_inscripcion(
 
     alfa = (alfa or "").strip()
     numeri = (numeri or "").strip()
+    programa = (programa or "").strip()
+    descripcion_programa = (descripcion_programa or "").strip()
+
     if not codigo_alfanumerico:
         if alfa and numeri:
             codigo_alfanumerico = f"{alfa} {numeri}"
@@ -121,7 +126,14 @@ def upsert_inscripcion(
 
     cursor.execute(
         """
-        SELECT id_inscripcion, version_periodo, alfa, numeri, codigo_alfanumerico, nombre_curso
+        SELECT id_inscripcion,
+               version_periodo,
+               alfa,
+               numeri,
+               codigo_alfanumerico,
+               nombre_curso,
+               programa,
+               descripcion_programa
           FROM Inscripcion
          WHERE id_estudiante = ? AND id_curso = ? AND id_periodo = ?
         """,
@@ -130,13 +142,24 @@ def upsert_inscripcion(
     registro = cursor.fetchone()
 
     if registro:
-        id_inscripcion, version_actual, alfa_db, numeri_db, codigo_db, nombre_db = registro
+        (
+            id_inscripcion,
+            version_actual,
+            alfa_db,
+            numeri_db,
+            codigo_db,
+            nombre_db,
+            programa_db,
+            desc_prog_db,
+        ) = registro
         nueva_version = (version_actual or 1) + 1
 
         set_alfa = alfa_db or alfa or None
         set_numeri = numeri_db or numeri or None
         set_codigo = codigo_db or codigo_alfanumerico or None
         set_nombre = nombre_db or (nombre_curso or None)
+        set_programa = programa_db or programa or None
+        set_desc_prog = desc_prog_db or descripcion_programa or None
 
         cursor.execute(
             """
@@ -146,10 +169,22 @@ def upsert_inscripcion(
                    alfa = COALESCE(alfa, ?),
                    numeri = COALESCE(numeri, ?),
                    codigo_alfanumerico = COALESCE(codigo_alfanumerico, ?),
-                   nombre_curso = COALESCE(nombre_curso, ?)
+                   nombre_curso = COALESCE(nombre_curso, ?),
+                   programa = COALESCE(programa, ?),
+                   descripcion_programa = COALESCE(descripcion_programa, ?)
              WHERE id_inscripcion = ?
             """,
-            (nota, nueva_version, set_alfa, set_numeri, set_codigo, set_nombre, id_inscripcion),
+            (
+                nota,
+                nueva_version,
+                set_alfa,
+                set_numeri,
+                set_codigo,
+                set_nombre,
+                set_programa,
+                set_desc_prog,
+                id_inscripcion,
+            ),
         )
         conn.commit()
         print(f"🔁 Actualizada inscripción de {id_estudiante} en curso {id_curso}.")
@@ -159,26 +194,24 @@ def upsert_inscripcion(
         cursor.execute(
             """
             INSERT INTO Inscripcion
-                (id_estudiante, id_curso, id_periodo, nota, alfa, numeri, codigo_alfanumerico, nombre_curso)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (id_estudiante, id_curso, id_periodo, nota,
+                 alfa, numeri, codigo_alfanumerico, nombre_curso,
+                 programa, descripcion_programa)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (id_estudiante, id_curso, id_periodo, nota, alfa or None, numeri or None,
-             codigo_alfanumerico or None, nombre_curso or None),
+            (
+                id_estudiante,
+                id_curso,
+                id_periodo,
+                nota,
+                alfa or None,
+                numeri or None,
+                codigo_alfanumerico or None,
+                nombre_curso or None,
+                programa or None,
+                descripcion_programa or None,
+            ),
         )
         conn.commit()
         print(f"🆕 Nueva inscripción de {id_estudiante} en curso {id_curso}.")
         return "insertado"
-
-
-# ======================================================
-# PRUEBA LOCAL
-# ======================================================
-if __name__ == "__main__":
-    with sqlite3.connect(DB_PATH) as conn:
-        upsert_curso(conn, "TRANSF-ISOFV033", "Transferencia de curso ISOF", 3, "ISOF", "V033")
-        accion = upsert_inscripcion(
-            conn, "948997", "TRANSF-ISOFV033", "202413", 4.7,
-            alfa="ISOF", numeri="V033", nombre_curso="Transferencia de curso ISOF"
-        )
-        print("Acción:", accion)
-        registrar_evento(conn, "tester", "Prueba de curso por transferencia")

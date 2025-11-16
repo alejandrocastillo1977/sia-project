@@ -39,7 +39,8 @@ def listar_estudiantes(limit: int = 200) -> List[Dict[str, Any]]:
     with _connect() as conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
-        cur.execute("""
+        cur.execute(
+            """
             SELECT e.id_estudiante,
                    COALESCE(NULLIF(TRIM(e.nombre), ''), 'Desconocido') AS nombre,
                    COALESCE(NULLIF(TRIM(e.programa), ''), 'Pendiente') AS programa,
@@ -47,7 +48,9 @@ def listar_estudiantes(limit: int = 200) -> List[Dict[str, Any]]:
             FROM Estudiante e
             ORDER BY e.id_estudiante
             LIMIT ?;
-        """, (limit,))
+        """,
+            (limit,),
+        )
         rows = cur.fetchall()
     return [dict(r) for r in rows]
 
@@ -58,7 +61,8 @@ def buscar_estudiantes(query: str, limit: int = 50) -> List[Dict[str, Any]]:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         if q.isdigit():
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT e.id_estudiante,
                        COALESCE(NULLIF(TRIM(e.nombre), ''), 'Desconocido') AS nombre,
                        COALESCE(NULLIF(TRIM(e.programa), ''), 'Pendiente') AS programa,
@@ -66,9 +70,12 @@ def buscar_estudiantes(query: str, limit: int = 50) -> List[Dict[str, Any]]:
                 FROM Estudiante e
                 WHERE e.id_estudiante = ?
                 LIMIT ?;
-            """, (q, limit))
+            """,
+                (q, limit),
+            )
         else:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT e.id_estudiante,
                        COALESCE(NULLIF(TRIM(e.nombre), ''), 'Desconocido') AS nombre,
                        COALESCE(NULLIF(TRIM(e.programa), ''), 'Pendiente') AS programa,
@@ -77,7 +84,9 @@ def buscar_estudiantes(query: str, limit: int = 50) -> List[Dict[str, Any]]:
                 WHERE UPPER(e.nombre) LIKE '%' || UPPER(?) || '%'
                 ORDER BY e.nombre
                 LIMIT ?;
-            """, (q, limit))
+            """,
+                (q, limit),
+            )
         rows = cur.fetchall()
     return [dict(r) for r in rows]
 
@@ -85,11 +94,16 @@ def buscar_estudiantes(query: str, limit: int = 50) -> List[Dict[str, Any]]:
 def historial_estudiante(id_estudiante: str) -> List[Dict[str, Any]]:
     """
     Historial del estudiante con preferencia por el snapshot de Inscripcion.
+
+    Incluye:
+      - Datos del curso (código, nombre, nota, versión).
+      - Snapshot de programa: programa (código) y descripcion_programa (nombre largo).
     """
     with _connect() as conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
-        cur.execute("""
+        cur.execute(
+            """
             SELECT 
                 i.id_periodo,
                 p.anio,
@@ -98,13 +112,17 @@ def historial_estudiante(id_estudiante: str) -> List[Dict[str, Any]]:
                 COALESCE(NULLIF(TRIM(i.codigo_alfanumerico), ''), c.codigo_alfanumerico) AS codigo_curso,
                 COALESCE(NULLIF(TRIM(i.nombre_curso), ''), c.nombre) AS nombre_curso,
                 i.nota,
-                i.version_periodo
+                i.version_periodo,
+                i.programa,
+                i.descripcion_programa
             FROM Inscripcion i
             LEFT JOIN Curso c ON c.id_curso = i.id_curso
             LEFT JOIN PeriodoAcademico p ON p.id_periodo = i.id_periodo
             WHERE i.id_estudiante = ?
             ORDER BY i.id_periodo ASC, i.id_curso;
-        """, (id_estudiante,))
+        """,
+            (id_estudiante,),
+        )
         rows = cur.fetchall()
     return [dict(r) for r in rows]
 
@@ -113,19 +131,23 @@ def datos_estudiante(id_estudiante: str) -> Optional[Dict[str, Any]]:
     with _connect() as conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
-        cur.execute("""
+        cur.execute(
+            """
             SELECT e.id_estudiante,
                    COALESCE(NULLIF(TRIM(e.nombre), ''), 'Desconocido') AS nombre,
                    COALESCE(NULLIF(TRIM(e.programa), ''), 'Pendiente') AS programa,
                    e.correo_institucional
             FROM Estudiante e
             WHERE e.id_estudiante = ?;
-        """, (id_estudiante,))
+        """,
+            (id_estudiante,),
+        )
         row = cur.fetchone()
     return dict(row) if row else None
 
 
 from database.db_init import DB_PATH
+
 
 def obtener_notas_por_umbral(tipo: str, id_periodo: str, umbral: float):
     """
@@ -170,19 +192,19 @@ def listar_periodos() -> list[str]:
         cur.execute("SELECT DISTINCT id_periodo FROM PeriodoAcademico ORDER BY id_periodo DESC;")
         rows = [r[0] for r in cur.fetchall()]
     return rows
-# --- Auditoría: listar eventos ---
-from typing import Optional, List, Dict, Any
+
 
 # --- Auditoría: listar eventos ---
-from typing import Optional, List, Dict, Any
+from typing import Optional as _Opt, List as _List, Dict as _Dict, Any as _Any
+
 
 def listar_eventos_auditoria(
     limit: int = 500,
-    usuario: Optional[str] = None,   # filtro específico por usuario (substring)
-    desde: Optional[str] = None,     # 'YYYY-MM-DD' o 'YYYY-MM-DD HH:MM:SS'
-    hasta: Optional[str] = None,     # 'YYYY-MM-DD' o 'YYYY-MM-DD HH:MM:SS'
-    filtro: Optional[str] = None     # 🔹 NUEVO: búsqueda libre en usuario/accion
-) -> List[Dict[str, Any]]:
+    usuario: _Opt[str] = None,   # filtro específico por usuario (substring)
+    desde: _Opt[str] = None,     # 'YYYY-MM-DD' o 'YYYY-MM-DD HH:MM:SS'
+    hasta: _Opt[str] = None,     # 'YYYY-MM-DD' o 'YYYY-MM-DD HH:MM:SS'
+    filtro: _Opt[str] = None     # 🔹 NUEVO: búsqueda libre en usuario/accion
+) -> _List[_Dict[str, _Any]]:
     """
     Devuelve eventos de la tabla Auditoria con filtros opcionales.
     - usuario: substring case-insensitive en la columna 'usuario'
@@ -199,7 +221,7 @@ def listar_eventos_auditoria(
             FROM Auditoria
             WHERE 1=1
         """
-        params: list[Any] = []
+        params: list[_Any] = []
 
         if usuario:
             sql += " AND UPPER(usuario) LIKE '%' || UPPER(?) || '%'"

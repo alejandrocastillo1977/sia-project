@@ -1,6 +1,6 @@
 -- ========================================
--- SIA Database Schema (v0.3)
--- Fecha: 2025-11-08
+-- SIA Database Schema (v0.4)
+-- Fecha: 2025-11-16
 -- Autor: Coordinador del Proyecto SIA
 -- ========================================
 
@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS PeriodoAcademico (
 );
 
 -- Tabla: Inscripcion (relación estudiante-curso-periodo)
--- v0.3: agrega snapshot del curso (alfa, numeri, codigo_alfanumerico, nombre_curso)
+-- v0.3: snapshot del curso
+-- v0.4: agrega snapshot de programa (programa, descripcion_programa)
 CREATE TABLE IF NOT EXISTS Inscripcion (
     id_inscripcion INTEGER PRIMARY KEY AUTOINCREMENT,
     id_estudiante TEXT NOT NULL,
@@ -45,6 +46,10 @@ CREATE TABLE IF NOT EXISTS Inscripcion (
     numeri TEXT,
     codigo_alfanumerico TEXT,
     nombre_curso TEXT,
+
+    -- Snapshot del programa al momento del cargue
+    programa TEXT,              -- código corto, ej. ISUT / ISOF
+    descripcion_programa TEXT,  -- nombre largo, ej. INGENIERIA DE SISTEMAS
 
     FOREIGN KEY (id_estudiante) REFERENCES Estudiante(id_estudiante) ON DELETE CASCADE,
     FOREIGN KEY (id_curso) REFERENCES Curso(id_curso),

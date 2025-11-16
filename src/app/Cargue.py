@@ -30,14 +30,6 @@ def _obtener_tamano_mb(uploaded_file) -> float:
     return round(size / (1024 ** 2), 2)
 
 
-def _estimar_tiempo_procesamiento(mb: float) -> float:
-    """Calcula un tiempo estimado (en segundos) del procesamiento."""
-
-    velocidad_aproximada = 1.8  # MB/s estimados para validaciones en local
-    base_segundos = 4.0  # Tiempo base de inicialización
-    return max(base_segundos, base_segundos + (mb / max(velocidad_aproximada, 0.1)))
-
-
 def _render_historial_sidebar() -> None:
     """Muestra los últimos cargues registrados en el panel lateral."""
 
@@ -71,10 +63,12 @@ def registrar_error_auditoria(nombre_archivo: str, errores: dict):
 
 def mostrar_cargue():
     st.title("📥 Módulo de Cargue y Validación ARGOS")
-    st.markdown("""
+    st.markdown(
+        """
     Permite cargar reportes ARGOS (.xlsx), validar su estructura híbrida (A–W)
     y actualizar la base de datos del Sistema de Inteligencia Académica (SIA).
-    """)
+    """
+    )
 
     st.divider()
 
@@ -90,16 +84,13 @@ def mostrar_cargue():
         st.success(f"Archivo seleccionado: {uploaded_file.name}")
         st.toast(f"📂 `{uploaded_file.name}` listo para validación.")
 
-        tamano_mb = _obtener_tamano_mb(uploaded_file)
-        tiempo_estimado = _estimar_tiempo_procesamiento(tamano_mb)
-        st.info(
-            f"⏱️ Tiempo estimado de procesamiento: {tiempo_estimado:.1f} segundos "
-            f"para {tamano_mb:.2f} MB."
-        )
+        # Si quisieras mostrar solo el tamaño del archivo, podrías usar:
+        # tamano_mb = _obtener_tamano_mb(uploaded_file)
+        # st.caption(f"Tamaño del archivo: {tamano_mb:.2f} MB.")
 
         modo = st.radio(
             "Selecciona el modo de ejecución:",
-            [MODO_SIMULADO, MODO_REAL]
+            [MODO_SIMULADO, MODO_REAL],
         )
 
         procesar = st.button("🚀 Procesar archivo")
@@ -126,13 +117,15 @@ def mostrar_cargue():
 
                 paso_texto.success("✅ Validación estructural exitosa. Preparando resumen...")
                 st.subheader("📋 Resumen del archivo:")
-                st.json({
-                    "Registros totales": resultados["total_registros"],
-                    "Duplicados detectados": resultados.get("duplicados"),
-                    "Columnas válidas": resultados.get("columnas_validas"),
-                    "Notas válidas": resultados.get("notas_validas"),
-                    "Periodos válidos": resultados.get("periodos_validos"),
-                })
+                st.json(
+                    {
+                        "Registros totales": resultados["total_registros"],
+                        "Duplicados detectados": resultados.get("duplicados"),
+                        "Columnas válidas": resultados.get("columnas_validas"),
+                        "Notas válidas": resultados.get("notas_validas"),
+                        "Periodos válidos": resultados.get("periodos_validos"),
+                    }
+                )
 
                 progreso.progress(55, text="Analizando registros")
 
@@ -152,6 +145,11 @@ def mostrar_cargue():
                 elif modo == MODO_REAL:
                     st.subheader("💾 Cargue real a la base de datos")
                     resumen = cargar_a_bd(df)
+
+                    tiempo_real = resumen.get("tiempo_segundos")
+                    if tiempo_real is not None:
+                        st.info(f"⏱️ Tiempo real de procesamiento: {tiempo_real:.2f} segundos.")
+
                     progreso.progress(85, text="Escritura en base de datos finalizada")
                     col1, col2, col3, col4, col5 = st.columns(5)
                     col1.metric("Total registros", resumen["total"])
@@ -167,5 +165,4 @@ def mostrar_cargue():
                 paso_texto.empty()
 
     else:
-        st.warning("Por favor, selecciona un archivo para continuar.")
-        
+        st.warning("Por favor, selecciona un archivo para continuar.")  

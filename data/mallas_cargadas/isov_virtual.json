@@ -1,0 +1,107 @@
+{
+  "programa": "Ingeniería de Software – UNIMINUTO Virtual",
+  "creditos_totales": 140,
+  "plan": [
+    {
+      "cuatrimestre": 1,
+      "cursos": [
+        { "codigo": "INFO 1030", "nombre": "Habilidades Digitales para el Aprendizaje", "creditos": 3 },
+        { "codigo": "LENG 1040", "nombre": "Lectura y Escritura en el Contexto Digital", "creditos": 3 },
+        { "codigo": "UVFI D022", "nombre": "Precálculo", "creditos": 3 },
+        { "codigo": "FHUM 1010", "nombre": "Proyecto de Vida", "creditos": 2 },
+        { "codigo": "ISOF V003", "nombre": "Introducción a la Ingeniería de Software", "creditos": 3 }
+      ]
+    },
+    {
+      "cuatrimestre": 2,
+      "cursos": [
+        { "codigo": "UVFI V011", "nombre": "Álgebra Lineal", "creditos": 3 },
+        { "codigo": "ISOF V013", "nombre": "Desarrollo de Software Orientado a Objetos", "creditos": 3 },
+        { "codigo": "ISUD D063", "nombre": "Infraestructura de TI", "creditos": 3 },
+        { "codigo": "FHUM 1020", "nombre": "Cátedra Minuto de Dios", "creditos": 2 }
+      ]
+    },
+    {
+      "cuatrimestre": 3,
+      "cursos": [
+        { "codigo": "UVFI V051", "nombre": "Matemáticas Discretas", "creditos": 3 },
+        { "codigo": "UVFI D031", "nombre": "Cálculo Diferencial", "creditos": 3 },
+        { "codigo": "ISOF V023", "nombre": "Estructuras de Datos y Análisis de Algoritmos", "creditos": 3 },
+        { "codigo": "ISOF V033", "nombre": "Análisis y Diseño de Software", "creditos": 3 },
+        { "codigo": "ISOF V043", "nombre": "Sistemas de Gestión de Bases de Datos", "creditos": 3 }
+      ]
+    },
+    {
+      "cuatrimestre": 4,
+      "cursos": [
+        { "codigo": "UVFI D061", "nombre": "Cálculo Integral", "creditos": 3 },
+        { "codigo": "ISOF V053", "nombre": "Ingeniería de Software Avanzada", "creditos": 3 },
+        { "codigo": "ISOF V063", "nombre": "Desarrollo de Software Orientado a la Web", "creditos": 3 },
+        { "codigo": "ISOF V073", "nombre": "Data Warehouse y Minería de Datos", "creditos": 3 },
+        { "codigo": "ISUD D103", "nombre": "Sistemas Operativos", "creditos": 3 }
+      ]
+    },
+    {
+      "cuatrimestre": 5,
+      "cursos": [
+        { "codigo": "UVFI D041", "nombre": "Física Mecánica", "creditos": 3 },
+        { "codigo": "FHUM 1120", "nombre": "Constitución Política", "creditos": 2 },
+        { "codigo": "ISOF V083", "nombre": "Diseño de Interfaces", "creditos": 3 },
+        { "codigo": "ISOF V093", "nombre": "Inteligencia de Negocios", "creditos": 3 }
+      ]
+    },
+    {
+      "cuatrimestre": 6,
+      "cursos": [
+        { "codigo": "UVFI V021", "nombre": "Ecuaciones Diferenciales", "creditos": 3 },
+        { "codigo": "ETIC 190", "nombre": "Ética Profesional", "creditos": 2 },
+        {
+          "codigo": ["ADMI 1070", "ADMI 2000"],
+          "nombre": "Emprendimiento",
+          "creditos": 3
+        },
+        { "codigo": "ISOF V103", "nombre": "Pruebas de Software y Aseguramiento de la Calidad", "creditos": 3 },
+        { "codigo": "ISOF V113", "nombre": "Infraestructura en la Nube", "creditos": 3 }
+      ]
+    },
+    {
+      "cuatrimestre": 7,
+      "cursos": [
+        { "codigo": "UVFI D141", "nombre": "Física Electromagnética", "creditos": 3 },
+        { "codigo": "ISOF V123", "nombre": "Seguridad en el Desarrollo de Software", "creditos": 3 },
+        { "codigo": "ISOF V133", "nombre": "Desarrollo de Software en Plataformas Móviles", "creditos": 3 },
+        { "codigo": "ISOF V143", "nombre": "Ethical Hacking y Seguridad de la Información", "creditos": 3 },
+        { "codigo": "ISOF V004", "nombre": "Electiva Profesional Complementaria I (CPC)", "creditos": 3 }
+      ]
+    },
+    {
+      "cuatrimestre": 8,
+      "cursos": [
+        { "codigo": "UVFI V031", "nombre": "Probabilidad y Estadística", "creditos": 3 },
+        { "codigo": "PRAC 1010", "nombre": "Práctica en Responsabilidad Social", "creditos": 3 },
+        { "codigo": "ISOF V153", "nombre": "Computación Bioinspirada", "creditos": 3 },
+        { "codigo": "ISOF V163", "nombre": "Inteligencia Artificial y Sistemas Inteligentes", "creditos": 3 },
+        { "codigo": "ISOF V014", "nombre": "Electiva Profesional Complementaria II (CPC)", "creditos": 3 }
+      ]
+    },
+    {
+      "cuatrimestre": 9,
+      "cursos": [
+        { "codigo": "UVFI V041", "nombre": "Geometría", "creditos": 3 },
+        { "codigo": "ISOF V173", "nombre": "Gerencia de Proyectos de Software", "creditos": 3 },
+        { "codigo": "ISOF V183", "nombre": "Machine Learning", "creditos": 3 },
+        { "codigo": "ISOF V193", "nombre": "Plataformas de Desarrollo de Software", "creditos": 3 },
+        { "codigo": "UVFI V061", "nombre": "Fundamentos de Investigación", "creditos": 3 }
+      ]
+    },
+    {
+      "cuatrimestre": 10,
+      "cursos": [
+        { "codigo": "ISOF V203", "nombre": "Administración y Gestión de la Configuración de Software", "creditos": 3 },
+        { "codigo": "UVFI V071", "nombre": "Metodología de la Investigación", "creditos": 3 },
+        { "codigo": "ISOF V024", "nombre": "Electiva Profesional Complementaria III (CPC)", "creditos": 3 },
+        { "codigo": "ISOF V034", "nombre": "Práctica Profesional", "creditos": 6 }
+      ]
+    }
+  ]
+}

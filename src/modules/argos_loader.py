@@ -1,6 +1,9 @@
 import sqlite3
-import pandas as pd
+import time
 from io import BytesIO
+
+import pandas as pd
+
 from modules.validators import resumen_validacion
 from database.upsert import upsert_inscripcion, upsert_curso, registrar_evento
 from database.db_init import DB_PATH
@@ -60,12 +63,15 @@ def cargar_a_bd(df: pd.DataFrame):
       - Estudiante
       - Curso (incluye código alfanumérico: ALFA + NUMERI)
       - PeriodoAcademico
-      - Inscripcion (con snapshot de curso)
+      - Inscripcion (con snapshot de curso y programa)
     y registra evento en Auditoria.
 
-    🔸 Ahora también procesa cursos con NRCS == 'TRANSFERENCIA'
-    asignándoles un NRC simbólico 'TRANSF-{ALFA}{NUMERI}'.
+    🔸 Procesa cursos con NRCS == 'TRANSFERENCIA' asignándoles
+       un NRC simbólico 'TRANSF-{ALFA}{NUMERI}'.
     """
+    # --- Medición de tiempo real de procesamiento ---
+    inicio = time.perf_counter()
+
     total = len(df)
     insertados = 0
     actualizados = 0
@@ -83,13 +89,19 @@ def cargar_a_bd(df: pd.DataFrame):
                 # --- Extracción de campos principales ---
                 id_estudiante = str(fila.get("ID_ESTUDIANTE", "")).strip()
                 nombre_estudiante = str(fila.get("NOMBRE_ESTUDIANTE", "Desconocido")).strip()
-                programa = str(fila.get("DESCRIPCION_PROGRAMA", "Pendiente")).strip()
+
+                # Código y descripción de programa
+                programa_codigo = str(fila.get("PROGRAMA", "")).strip()  # ISUT / ISOF / etc.
+                programa_desc = str(fila.get("DESCRIPCION_PROGRAMA", "Pendiente")).strip()
+
                 correo = None  # No viene en ARGOS
 
                 nrc_valor = str(fila.get("NRCS", "")).strip().upper()
                 alfa = str(fila.get("ALFA", "")).strip()
                 numeri = str(fila.get("NUMERI", "")).strip()
-                nombre_curso = str(fila.get("DESCRIPCION") or fila.get("DESCRIPION") or "Curso sin nombre").strip()
+                nombre_curso = str(
+                    fila.get("DESCRIPCION") or fila.get("DESCRIPION") or "Curso sin nombre"
+                ).strip()
 
                 # --- Detección de cursos de transferencia ---
                 if nrc_valor == "TRANSFERENCIA":
@@ -110,12 +122,23 @@ def cargar_a_bd(df: pd.DataFrame):
                     nota = 0.0
 
                 # --- Inserciones / actualizaciones ---
+
+                # Estudiante: conservamos programa "actual" como última descripción vista
                 cursor.execute(
                     """
                     INSERT OR IGNORE INTO Estudiante (id_estudiante, nombre, programa, correo_institucional)
                     VALUES (?, ?, ?, ?)
                     """,
-                    (id_estudiante, nombre_estudiante, programa, correo),
+                    (id_estudiante, nombre_estudiante, programa_desc, correo),
+                )
+                cursor.execute(
+                    """
+                    UPDATE Estudiante
+                       SET nombre = COALESCE(?, nombre),
+                           programa = COALESCE(?, programa)
+                     WHERE id_estudiante = ?
+                    """,
+                    (nombre_estudiante or None, programa_desc or None, id_estudiante),
                 )
 
                 # Curso (catálogo actual)
@@ -130,7 +153,7 @@ def cargar_a_bd(df: pd.DataFrame):
                     (id_periodo, anio, periodo),
                 )
 
-                # Inscripción (con snapshot del curso)
+                # Inscripción (con snapshot de curso y programa)
                 accion = upsert_inscripcion(
                     conn,
                     id_estudiante=id_estudiante,
@@ -141,6 +164,8 @@ def cargar_a_bd(df: pd.DataFrame):
                     numeri=numeri or None,
                     nombre_curso=nombre_curso or None,
                     codigo_alfanumerico=(f"{alfa} {numeri}".strip() if (alfa or numeri) else None),
+                    programa=programa_codigo or None,
+                    descripcion_programa=programa_desc or None,
                 )
 
                 if accion == "insertado":
@@ -152,10 +177,15 @@ def cargar_a_bd(df: pd.DataFrame):
                 print(f"⚠️ Error procesando fila {idx + 1}: {e}")
                 errores += 1
 
+        # --- Fin de procesamiento y cálculo de tiempo ---
+        fin = time.perf_counter()
+        duracion = fin - inicio
+
         resumen_txt = (
             f"Cargue ARGOS – {total} registros procesados "
             f"({insertados} nuevos, {actualizados} actualizados, {errores} errores, "
-            f"{transferencias} cursos por transferencia)"
+            f"{transferencias} cursos por transferencia) "
+            f"en {duracion:.2f} segundos"
         )
         registrar_evento(conn, "coordinador_academico", resumen_txt)
         conn.commit()
@@ -168,11 +198,5 @@ def cargar_a_bd(df: pd.DataFrame):
         "actualizados": actualizados,
         "errores": errores,
         "transferencias": transferencias,
+        "tiempo_segundos": round(duracion, 2),
     }
-
-
-# -------------------------------------------------
-# PRUEBA LOCAL
-# -------------------------------------------------
-if __name__ == "__main__":
-    print("🚀 Prueba de integración de cargue ARGOS con soporte de TRANSFERENCIAS")
