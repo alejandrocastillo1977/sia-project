@@ -1,4 +1,5 @@
 import sys
+import json
 from pathlib import Path
 from datetime import datetime
 
@@ -10,7 +11,11 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
 from database.queries import buscar_estudiantes, historial_estudiante, datos_estudiante
-from modules.load_data import mapear_malla_con_historico, obtener_malla_isov_virtual
+from modules.load_data import (
+    mapear_malla_con_historico,
+    obtener_malla_isov_virtual,
+    validar_y_normalizar_malla,
+)
 from modules.reports import exportar_excel_malla, exportar_pdf_malla
 
 
@@ -27,30 +32,149 @@ def _resumen_creditos(malla_cruzada: list[dict]) -> dict:
 
 
 def mostrar_malla():
-    st.title("🗺️ Malla Curricular – Ingeniería de Software (Virtual)")
+    MALLA_CFG_KEY = "malla_cfg_activa"
+    MALLA_RESUMEN_KEY = "malla_resumen_info"
+    MALLA_EST_KEY = "malla_sel_est"
+    MALLA_HIST_KEY = "malla_sel_hist"
+    MALLA_CRUCE_KEY = "malla_sel_malla"
+    MALLA_PROG_HIST_KEY = "malla_sel_programas_hist"
+
+    st.title("🗺️ Malla Curricular – Reporte cruzado por programa")
     st.markdown(
         """
-        Esta vista cruza la **malla oficial** del programa con el **histórico académico**
+        Esta vista cruza una **malla curricular seleccionada** con el **histórico académico**
         del estudiante:
 
         - APROBADO: nota final ≥ 3.0.
         - PERDIDO: nota final < 3.0.
         - TRANSFERENCIA: cursos registrados con NRC simbólico `TRANSF-*`.
         - PENDIENTE: cursos de la malla que aún no aparecen en el histórico.
+
+        Primero selecciona o carga la **malla curricular** y luego busca al estudiante.
         """
     )
 
     st.divider()
 
+    # -------------------------------------------------
+    # 1️⃣ Selección / carga de malla curricular
+    # -------------------------------------------------
+    st.subheader("1️⃣ Selección de malla curricular")
+
+    malla_cfg = st.session_state.get(MALLA_CFG_KEY)
+    malla_resumen = st.session_state.get(MALLA_RESUMEN_KEY)
+
+    origen = st.radio(
+        "Origen de la malla a utilizar:",
+        ["Malla por defecto (ISOF)", "Cargar malla desde archivo JSON"],
+        key="malla_origen",
+    )
+
+    # Malla por defecto (ISOF)
+    if origen == "Malla por defecto (ISOF)":
+        if st.button(
+            "Usar malla por defecto – Ingeniería de Software (ISOF)",
+            key="btn_malla_defecto",
+        ):
+            base = obtener_malla_isov_virtual()
+            try:
+                malla_norm = validar_y_normalizar_malla(base)
+            except Exception as e:  # pragma: no cover - solo mensaje en UI
+                st.error(f"Error al preparar la malla por defecto: {e}")
+            else:
+                plan = malla_norm.get("plan") or []
+                total_cuat = len(plan)
+                total_cursos = sum(len(b.get("cursos", [])) for b in plan)
+
+                st.session_state[MALLA_CFG_KEY] = malla_norm
+                st.session_state[MALLA_RESUMEN_KEY] = {
+                    "codigo_programa": malla_norm["codigo_programa"],
+                    "nombre_malla": malla_norm["nombre_malla"],
+                    "creditos_totales": malla_norm.get("creditos_totales", 0),
+                    "cuatrimestres": total_cuat,
+                    "total_cursos": total_cursos,
+                }
+                malla_cfg = malla_norm
+                malla_resumen = st.session_state[MALLA_RESUMEN_KEY]
+                st.success(
+                    f"Malla por defecto '{malla_norm['nombre_malla']}' "
+                    f"para programa {malla_norm['codigo_programa']} lista para usar."
+                )
+
+    # Malla desde JSON
+    else:
+        archivo_json = st.file_uploader(
+            "Cargar archivo JSON de malla curricular",
+            type=["json"],
+            key="malla_json",
+            help="Debe contener 'codigo_programa', 'nombre_malla', 'creditos_totales' y 'plan'.",
+        )
+        if archivo_json is not None and st.button(
+            "Validar y usar malla JSON", key="btn_validar_malla_json"
+        ):
+            try:
+                data = json.load(archivo_json)
+                malla_norm = validar_y_normalizar_malla(data)
+            except Exception as e:  # pragma: no cover - solo mensaje en UI
+                st.error(f"No se pudo validar la malla: {e}")
+                st.session_state.pop(MALLA_CFG_KEY, None)
+                st.session_state.pop(MALLA_RESUMEN_KEY, None)
+                malla_cfg = None
+                malla_resumen = None
+            else:
+                plan = malla_norm.get("plan") or []
+                total_cuat = len(plan)
+                total_cursos = sum(len(b.get("cursos", [])) for b in plan)
+
+                st.session_state[MALLA_CFG_KEY] = malla_norm
+                st.session_state[MALLA_RESUMEN_KEY] = {
+                    "codigo_programa": malla_norm["codigo_programa"],
+                    "nombre_malla": malla_norm["nombre_malla"],
+                    "creditos_totales": malla_norm.get("creditos_totales", 0),
+                    "cuatrimestres": total_cuat,
+                    "total_cursos": total_cursos,
+                }
+                malla_cfg = malla_norm
+                malla_resumen = st.session_state[MALLA_RESUMEN_KEY]
+                st.success(
+                    f"Malla '{malla_norm['nombre_malla']}' para programa "
+                    f"{malla_norm['codigo_programa']} lista para usar."
+                )
+
+    if malla_cfg and malla_resumen:
+        with st.expander("📋 Malla seleccionada", expanded=True):
+            st.write(f"**Programa (código):** {malla_resumen['codigo_programa']}")
+            st.write(f"**Nombre de la malla:** {malla_resumen['nombre_malla']}")
+            st.write(f"**Créditos totales:** {malla_resumen['creditos_totales']}")
+            st.write(f"**Cuatrimestres:** {malla_resumen['cuatrimestres']}")
+            st.write(f"**Cursos en la malla:** {malla_resumen['total_cursos']}")
+    else:
+        st.info("Selecciona o carga una malla curricular válida para continuar.")
+
+    st.divider()
+    st.subheader("2️⃣ Búsqueda de estudiante y cruce de malla")
+
+    if not malla_cfg:
+        st.caption("Selecciona primero una malla curricular válida para habilitar la búsqueda.")
+        return
+
+    # -------------------------------------------------
+    # Búsqueda de estudiante
+    # -------------------------------------------------
     q = st.text_input("ID del estudiante o nombre:")
     col_buscar, col_reset = st.columns([1, 1])
     buscar = col_buscar.button("Buscar", type="primary")
     limpiar = col_reset.button("Limpiar")
 
     if limpiar:
-        st.session_state.pop("malla_sel_est", None)
-        st.session_state.pop("malla_sel_hist", None)
-        st.session_state.pop("malla_sel_malla", None)
+        for key in (
+            MALLA_EST_KEY,
+            MALLA_HIST_KEY,
+            MALLA_CRUCE_KEY,
+            "malla_sel_idx",
+            MALLA_PROG_HIST_KEY,
+        ):
+            st.session_state.pop(key, None)
         st.rerun()
 
     if buscar and (q or "").strip():
@@ -78,38 +202,83 @@ def mostrar_malla():
 
         ficha = datos_estudiante(seleccionado["id_estudiante"]) or {}
         hist = historial_estudiante(seleccionado["id_estudiante"]) or []
-        malla = obtener_malla_isov_virtual()
-        cruce = mapear_malla_con_historico(hist, malla)
 
-        st.session_state["malla_sel_est"] = ficha
-        st.session_state["malla_sel_hist"] = hist
-        st.session_state["malla_sel_malla"] = cruce
-        st.rerun()
+        if not hist:
+            st.info("Este estudiante no tiene inscripciones registradas.")
+            st.session_state[MALLA_EST_KEY] = ficha
+            st.session_state[MALLA_HIST_KEY] = hist
+            st.session_state[MALLA_CRUCE_KEY] = None
+            st.session_state[MALLA_PROG_HIST_KEY] = []
+        else:
+            programas_hist = sorted(
+                {
+                    str(reg.get("codigo_programa") or "").upper()
+                    for reg in hist
+                    if reg.get("codigo_programa")
+                }
+            )
+            st.session_state[MALLA_PROG_HIST_KEY] = programas_hist
 
-    ficha = st.session_state.get("malla_sel_est")
-    cruce = st.session_state.get("malla_sel_malla")
+            cod_malla = str(malla_cfg.get("codigo_programa", "")).upper()
+            if not cod_malla or cod_malla not in programas_hist:
+                lista_prog = ", ".join(programas_hist) if programas_hist else "Ninguno"
+                st.warning(
+                    "El estudiante no tiene inscripciones en el programa de la malla seleccionada "
+                    f"({cod_malla or 'N/D'}). "
+                    f"Programas en su histórico: {lista_prog}."
+                )
+                st.session_state[MALLA_EST_KEY] = ficha
+                st.session_state[MALLA_HIST_KEY] = hist
+                st.session_state[MALLA_CRUCE_KEY] = None
+            else:
+                cruce = mapear_malla_con_historico(hist, malla_cfg)
+                st.session_state[MALLA_EST_KEY] = ficha
+                st.session_state[MALLA_HIST_KEY] = hist
+                st.session_state[MALLA_CRUCE_KEY] = cruce
 
-    if not ficha or not cruce:
+    ficha = st.session_state.get(MALLA_EST_KEY)
+    cruce = st.session_state.get(MALLA_CRUCE_KEY)
+    programas_hist = st.session_state.get(MALLA_PROG_HIST_KEY) or []
+    malla_cfg = st.session_state.get(MALLA_CFG_KEY) or malla_cfg
+    malla_resumen = st.session_state.get(MALLA_RESUMEN_KEY) or malla_resumen
+
+    if not ficha:
         st.caption(
-            "Ingresa un criterio y presiona **Buscar** para generar el reporte de malla."
+            "Selecciona o carga una malla, luego ingresa un criterio y presiona **Buscar** "
+            "para generar el reporte de malla."
         )
         return
 
     st.subheader("🪪 Datos del estudiante")
     st.json(ficha)
+    if programas_hist:
+        st.caption(
+            "Programas en el histórico del estudiante: " + ", ".join(programas_hist)
+        )
+
+    if not cruce:
+        st.info(
+            "No se puede generar la malla para este estudiante con la malla seleccionada. "
+            "Verifica que pertenezca al programa correspondiente."
+        )
+        return
 
     st.subheader("📚 Malla curricular por cuatrimestre")
 
     estado_color = {
-        "APROBADO": "#C8E6C9",      # verde suave
-        "PERDIDO": "#FFCDD2",       # rojo suave
-        "TRANSFERENCIA": "#BBDEFB", # azul suave
-        "PENDIENTE": "#F5F5F5",     # gris claro
+        "APROBADO": "#C8E6C9",  # verde suave
+        "PERDIDO": "#FFCDD2",  # rojo suave
+        "TRANSFERENCIA": "#BBDEFB",  # azul suave
+        "PENDIENTE": "#F5F5F5",  # gris claro
     }
 
     # --- Resumen de créditos por estado (para encabezados y PDF) ---
     resumen_creditos = _resumen_creditos(cruce)
-    total_creditos = sum(resumen_creditos.values())
+    total_creditos_malla = int(
+        malla_resumen.get("creditos_totales", 0) if malla_resumen else 0
+    )
+    if total_creditos_malla <= 0:
+        total_creditos_malla = sum(resumen_creditos.values())
 
     # Cred/aprob/transf = APR + TRANSF
     cred_aprob_transf = resumen_creditos["APROBADO"] + resumen_creditos["TRANSFERENCIA"]
@@ -119,10 +288,12 @@ def mostrar_malla():
 
     # Porc/aproba_malla = (Cred/aprob/transf * 100) / Créditos totales malla
     porc_aproba = (
-        (cred_aprob_transf * 100.0 / total_creditos) if total_creditos > 0 else 0.0
+        (cred_aprob_transf * 100.0 / total_creditos_malla)
+        if total_creditos_malla > 0
+        else 0.0
     )
     # Porc/pendie_malla = 100% - Porc/aproba_malla
-    porc_pendie = 100.0 - porc_aproba if total_creditos > 0 else 0.0
+    porc_pendie = 100.0 - porc_aproba if total_creditos_malla > 0 else 0.0
 
     col_res1, col_res2, col_res3, col_res4 = st.columns(4)
     col_res1.metric("Cred/aprob/transf", cred_aprob_transf)
@@ -175,12 +346,18 @@ def mostrar_malla():
 
     with col_pdf:
         if st.button("📄 Descargar PDF de malla", key="btn_malla_pdf"):
+            programas_txt = ", ".join(programas_hist) if programas_hist else "N/D"
+            programa_malla_texto = (
+                (malla_cfg.get("programa") or "").strip()
+                or (malla_cfg.get("nombre_malla") or "").strip()
+                or malla_cfg.get("codigo_programa", "N/D")
+            )
             datos_pdf = {
                 "Reporte": "Malla curricular cruzada",
                 "Estudiante": ficha.get("nombre", "N/D"),
                 "ID Estudiante": id_est,
-                "Programa": ficha.get("programa", "N/D"),
-                "Créditos totales malla": total_creditos,
+                "Programa": f"{programa_malla_texto} (histórico: {programas_txt})",
+                "Créditos totales malla": total_creditos_malla,
                 "Cred/aprob/transf": cred_aprob_transf,
                 "Créditos pendientes": cred_pend,
                 "Créditos perdidos": cred_perd,

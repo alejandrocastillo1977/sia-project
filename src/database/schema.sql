@@ -15,12 +15,28 @@ CREATE TABLE IF NOT EXISTS Estudiante (
     fecha_registro TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabla: Programa (catálogo de programas académicos)
+CREATE TABLE IF NOT EXISTS Programa (
+    codigo_programa TEXT PRIMARY KEY,
+    descripcion_programa TEXT,
+    rectoria TEXT,
+    descripcion_rectoria TEXT,
+    sede TEXT,
+    descripcion_sede TEXT,
+    facultad TEXT,
+    descripcion_facultad TEXT,
+    nivel TEXT,
+    descripcion_nivel TEXT
+);
+
 -- Tabla: Curso (catálogo actual)
 CREATE TABLE IF NOT EXISTS Curso (
     id_curso TEXT PRIMARY KEY,       -- NRC
     nombre TEXT NOT NULL,
     creditos INTEGER,
-    codigo_alfanumerico TEXT         -- ALFA + NUMERI (forma visible)
+    codigo_alfanumerico TEXT,        -- ALFA + NUMERI (forma visible)
+    codigo_programa TEXT,            -- Programa al que pertenece la oferta (PROGRAMA de ARGOS)
+    FOREIGN KEY (codigo_programa) REFERENCES Programa(codigo_programa)
 );
 
 -- Tabla: PeriodoAcademico
@@ -56,6 +72,29 @@ CREATE INDEX IF NOT EXISTS idx_insc_est ON Inscripcion(id_estudiante);
 CREATE INDEX IF NOT EXISTS idx_insc_per ON Inscripcion(id_periodo);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_insc_clave
     ON Inscripcion(id_estudiante, id_curso, id_periodo);
+
+-- Tabla: MallaCurricular (una malla oficial por programa)
+CREATE TABLE IF NOT EXISTS MallaCurricular (
+    id_malla INTEGER PRIMARY KEY AUTOINCREMENT,
+    codigo_programa TEXT NOT NULL,
+    nombre_malla TEXT NOT NULL,
+    creditos_totales INTEGER,
+    FOREIGN KEY (codigo_programa) REFERENCES Programa(codigo_programa),
+    UNIQUE (codigo_programa)
+);
+
+-- Tabla: MallaCurso (cursos que componen una malla)
+CREATE TABLE IF NOT EXISTS MallaCurso (
+    id_malla INTEGER NOT NULL,
+    codigo_curso TEXT NOT NULL,   -- Código alfanumérico oficial (ALFA + NUMERI)
+    nombre_oficial TEXT,
+    creditos INTEGER,
+    cuatrimestre INTEGER,
+    FOREIGN KEY (id_malla) REFERENCES MallaCurricular(id_malla) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_malla_curso
+    ON MallaCurso(id_malla, codigo_curso);
 
 -- Tabla: Auditoria
 CREATE TABLE IF NOT EXISTS Auditoria (

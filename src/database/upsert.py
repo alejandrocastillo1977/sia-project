@@ -28,6 +28,69 @@ def registrar_evento(conn: sqlite3.Connection, usuario: str, accion: str) -> Non
         print(f"⚠️ Error registrando evento en auditoría: {e}")
 
 
+def upsert_programa(
+    conn: sqlite3.Connection,
+    codigo_programa: str,
+    descripcion_programa: str | None = None,
+    rectoria: str | None = None,
+    descripcion_rectoria: str | None = None,
+    sede: str | None = None,
+    descripcion_sede: str | None = None,
+    facultad: str | None = None,
+    descripcion_facultad: str | None = None,
+    nivel: str | None = None,
+    descripcion_nivel: str | None = None,
+) -> None:
+    if not codigo_programa:
+        return
+
+    codigo_programa = str(codigo_programa).strip().upper()
+    if not codigo_programa:
+        return
+
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO Programa (
+            codigo_programa,
+            descripcion_programa,
+            rectoria,
+            descripcion_rectoria,
+            sede,
+            descripcion_sede,
+            facultad,
+            descripcion_facultad,
+            nivel,
+            descripcion_nivel
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(codigo_programa) DO UPDATE SET
+            descripcion_programa = excluded.descripcion_programa,
+            rectoria = excluded.rectoria,
+            descripcion_rectoria = excluded.descripcion_rectoria,
+            sede = excluded.sede,
+            descripcion_sede = excluded.descripcion_sede,
+            facultad = excluded.facultad,
+            descripcion_facultad = excluded.descripcion_facultad,
+            nivel = excluded.nivel,
+            descripcion_nivel = excluded.descripcion_nivel;
+        """,
+        (
+            codigo_programa,
+            descripcion_programa,
+            rectoria,
+            descripcion_rectoria,
+            sede,
+            descripcion_sede,
+            facultad,
+            descripcion_facultad,
+            nivel,
+            descripcion_nivel,
+        ),
+    )
+    conn.commit()
+
+
 # ======================================================
 # FUNCIÓN: UPSERT CURSO (CON CÓDIGO ALFANUMÉRICO)
 # ======================================================
@@ -37,7 +100,8 @@ def upsert_curso(
     nombre: str,
     creditos: int = None,
     alfa: str = None,
-    numeri: str = None
+    numeri: str = None,
+    codigo_programa: str | None = None,
 ) -> None:
     """
     Inserta o actualiza un curso con su código alfanumérico.
@@ -49,7 +113,6 @@ def upsert_curso(
         print("⚠️ No se puede registrar curso sin 'id_curso'.")
         return
 
-    # 🔹 Permitir NRC simbólico (transferencias)
     id_curso = str(id_curso).strip().upper()
 
     codigo_alfanumerico = None
@@ -62,17 +125,20 @@ def upsert_curso(
     elif numeri:
         codigo_alfanumerico = numeri
 
+    codigo_programa = (codigo_programa or "").strip().upper() or None
+
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO Curso (id_curso, nombre, creditos, codigo_alfanumerico)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO Curso (id_curso, nombre, creditos, codigo_alfanumerico, codigo_programa)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(id_curso) DO UPDATE SET
             nombre = excluded.nombre,
             creditos = excluded.creditos,
-            codigo_alfanumerico = excluded.codigo_alfanumerico;
+            codigo_alfanumerico = excluded.codigo_alfanumerico,
+            codigo_programa = excluded.codigo_programa;
         """,
-        (id_curso, nombre, creditos, codigo_alfanumerico),
+        (id_curso, nombre, creditos, codigo_alfanumerico, codigo_programa),
     )
     conn.commit()
     print(f"📘 Curso actualizado/insertado: {id_curso} → {codigo_alfanumerico or 'N/A'}")
@@ -162,8 +228,16 @@ def upsert_inscripcion(
                 (id_estudiante, id_curso, id_periodo, nota, alfa, numeri, codigo_alfanumerico, nombre_curso)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (id_estudiante, id_curso, id_periodo, nota, alfa or None, numeri or None,
-             codigo_alfanumerico or None, nombre_curso or None),
+            (
+                id_estudiante,
+                id_curso,
+                id_periodo,
+                nota,
+                alfa or None,
+                numeri or None,
+                codigo_alfanumerico or None,
+                nombre_curso or None,
+            ),
         )
         conn.commit()
         print(f"🆕 Nueva inscripción de {id_estudiante} en curso {id_curso}.")
@@ -177,8 +251,14 @@ if __name__ == "__main__":
     with sqlite3.connect(DB_PATH) as conn:
         upsert_curso(conn, "TRANSF-ISOFV033", "Transferencia de curso ISOF", 3, "ISOF", "V033")
         accion = upsert_inscripcion(
-            conn, "948997", "TRANSF-ISOFV033", "202413", 4.7,
-            alfa="ISOF", numeri="V033", nombre_curso="Transferencia de curso ISOF"
+            conn,
+            "948997",
+            "TRANSF-ISOFV033",
+            "202413",
+            4.7,
+            alfa="ISOF",
+            numeri="V033",
+            nombre_curso="Transferencia de curso ISOF",
         )
         print("Acción:", accion)
         registrar_evento(conn, "tester", "Prueba de curso por transferencia")

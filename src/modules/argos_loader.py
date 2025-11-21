@@ -2,7 +2,12 @@ import sqlite3
 import pandas as pd
 from io import BytesIO
 from modules.validators import resumen_validacion
-from database.upsert import upsert_inscripcion, upsert_curso, registrar_evento
+from database.upsert import (
+    upsert_inscripcion,
+    upsert_curso,
+    registrar_evento,
+    upsert_programa,
+)
 from database.db_init import DB_PATH
 
 
@@ -80,16 +85,50 @@ def cargar_a_bd(df: pd.DataFrame):
 
         for idx, fila in df.iterrows():
             try:
-                # --- Extracción de campos principales ---
+                # --- Extracción de campos de estudiante ---
                 id_estudiante = str(fila.get("ID_ESTUDIANTE", "")).strip()
-                nombre_estudiante = str(fila.get("NOMBRE_ESTUDIANTE", "Desconocido")).strip()
-                programa = str(fila.get("DESCRIPCION_PROGRAMA", "Pendiente")).strip()
+                nombre_estudiante = str(
+                    fila.get("NOMBRE_ESTUDIANTE", "Desconocido")
+                ).strip()
+
+                # --- Datos de programa / contexto institucional ---
+                codigo_programa = str(fila.get("PROGRAMA", "")).strip().upper()
+                descripcion_programa = str(
+                    fila.get("DESCRIPCION_PROGRAMA", "Pendiente")
+                ).strip()
+
+                rectoria = str(fila.get("RECTORIA", "")).strip() or None
+                descripcion_rectoria = (
+                    str(fila.get("DESCRIPCION_RECTORIA", "")).strip() or None
+                )
+                sede = str(fila.get("SEDE", "")).strip() or None
+                descripcion_sede = (
+                    str(fila.get("DESCRIPCION_SEDE", "")).strip() or None
+                )
+                facultad = str(
+                    fila.get("FACULTA") or fila.get("FACULTAD") or ""
+                ).strip() or None
+                descripcion_facultad = (
+                    str(fila.get("DESCRIPCION_FACULTAD", "")).strip() or None
+                )
+                nivel = str(fila.get("NIVEL", "")).strip() or None
+                descripcion_nivel = (
+                    str(fila.get("DESCRIPCION_NIVEL", "")).strip() or None
+                )
+
+                # Lo que se guarda en Estudiante.programa es el nombre legible
+                programa_visible = descripcion_programa or codigo_programa or "Pendiente"
                 correo = None  # No viene en ARGOS
 
+                # --- Curso / NRC / código alfanumérico ---
                 nrc_valor = str(fila.get("NRCS", "")).strip().upper()
                 alfa = str(fila.get("ALFA", "")).strip()
                 numeri = str(fila.get("NUMERI", "")).strip()
-                nombre_curso = str(fila.get("DESCRIPCION") or fila.get("DESCRIPION") or "Curso sin nombre").strip()
+                nombre_curso = str(
+                    fila.get("DESCRIPCION")
+                    or fila.get("DESCRIPION")
+                    or "Curso sin nombre"
+                ).strip()
 
                 # --- Detección de cursos de transferencia ---
                 if nrc_valor == "TRANSFERENCIA":
@@ -100,8 +139,16 @@ def cargar_a_bd(df: pd.DataFrame):
 
                 # --- Periodo y nota ---
                 id_periodo = str(fila.get("PERIODO", "")).strip()
-                anio = int(id_periodo[:4]) if len(id_periodo) >= 4 and id_periodo[:4].isdigit() else None
-                periodo = int(id_periodo[4:]) if len(id_periodo) > 4 and id_periodo[4:].isdigit() else None
+                anio = (
+                    int(id_periodo[:4])
+                    if len(id_periodo) >= 4 and id_periodo[:4].isdigit()
+                    else None
+                )
+                periodo = (
+                    int(id_periodo[4:])
+                    if len(id_periodo) > 4 and id_periodo[4:].isdigit()
+                    else None
+                )
 
                 nota_str = str(fila.get("DEFINITIVA", "0")).replace(",", ".")
                 try:
@@ -109,19 +156,43 @@ def cargar_a_bd(df: pd.DataFrame):
                 except ValueError:
                     nota = 0.0
 
-                # --- Inserciones / actualizaciones ---
+                # --- Programa (catálogo) ---
+                if codigo_programa:
+                    upsert_programa(
+                        conn,
+                        codigo_programa=codigo_programa,
+                        descripcion_programa=descripcion_programa or None,
+                        rectoria=rectoria,
+                        descripcion_rectoria=descripcion_rectoria,
+                        sede=sede,
+                        descripcion_sede=descripcion_sede,
+                        facultad=facultad,
+                        descripcion_facultad=descripcion_facultad,
+                        nivel=nivel,
+                        descripcion_nivel=descripcion_nivel,
+                    )
+
+                # --- Estudiante ---
                 cursor.execute(
                     """
                     INSERT OR IGNORE INTO Estudiante (id_estudiante, nombre, programa, correo_institucional)
                     VALUES (?, ?, ?, ?)
                     """,
-                    (id_estudiante, nombre_estudiante, programa, correo),
+                    (id_estudiante, nombre_estudiante, programa_visible, correo),
                 )
 
-                # Curso (catálogo actual)
-                upsert_curso(conn, id_curso, nombre_curso, creditos=None, alfa=alfa, numeri=numeri)
+                # --- Curso (catálogo actual, asociado a un programa) ---
+                upsert_curso(
+                    conn,
+                    id_curso,
+                    nombre_curso,
+                    creditos=None,
+                    alfa=alfa,
+                    numeri=numeri,
+                    codigo_programa=codigo_programa or None,
+                )
 
-                # Periodo académico
+                # --- Periodo académico ---
                 cursor.execute(
                     """
                     INSERT OR IGNORE INTO PeriodoAcademico (id_periodo, anio, periodo)
@@ -130,7 +201,7 @@ def cargar_a_bd(df: pd.DataFrame):
                     (id_periodo, anio, periodo),
                 )
 
-                # Inscripción (con snapshot del curso)
+                # --- Inscripción (con snapshot del curso) ---
                 accion = upsert_inscripcion(
                     conn,
                     id_estudiante=id_estudiante,
@@ -140,7 +211,9 @@ def cargar_a_bd(df: pd.DataFrame):
                     alfa=alfa or None,
                     numeri=numeri or None,
                     nombre_curso=nombre_curso or None,
-                    codigo_alfanumerico=(f"{alfa} {numeri}".strip() if (alfa or numeri) else None),
+                    codigo_alfanumerico=(
+                        f"{alfa} {numeri}".strip() if (alfa or numeri) else None
+                    ),
                 )
 
                 if accion == "insertado":
@@ -176,3 +249,4 @@ def cargar_a_bd(df: pd.DataFrame):
 # -------------------------------------------------
 if __name__ == "__main__":
     print("🚀 Prueba de integración de cargue ARGOS con soporte de TRANSFERENCIAS")
+    
