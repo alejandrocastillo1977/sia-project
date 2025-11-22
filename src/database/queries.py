@@ -245,4 +245,60 @@ def listar_eventos_auditoria(
         rows = cur.fetchall()
 
     return [dict(r) for r in rows]
-    
+
+def obtener_historial_estudiantes_por_programa(
+    codigo_programa: str,
+) -> list[dict]:
+    """
+    Devuelve el historial académico crudo de todos los estudiantes
+    asociados al programa indicado por `codigo_programa`.
+
+    Cada dict de la lista incluye:
+    - id_estudiante: str
+    - nombre: str
+    - programa: str
+    - codigo_programa: str
+    - id_periodo: str
+    - nrc: str
+    - codigo_curso: str
+    - nombre_curso: str
+    - nota: float | None
+    - version_periodo: int | None
+    """
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT
+                i.id_estudiante AS id_estudiante,
+                COALESCE(NULLIF(TRIM(e.nombre), ''), 'Desconocido') AS nombre,
+                COALESCE(NULLIF(TRIM(e.programa), ''), 'Pendiente') AS programa,
+                c.codigo_programa AS codigo_programa,
+                i.id_periodo AS id_periodo,
+                i.id_curso AS nrc,
+                COALESCE(
+                    NULLIF(TRIM(i.codigo_alfanumerico), ''),
+                    c.codigo_alfanumerico
+                ) AS codigo_curso,
+                COALESCE(
+                    NULLIF(TRIM(i.nombre_curso), ''),
+                    c.nombre
+                ) AS nombre_curso,
+                i.nota AS nota,
+                i.version_periodo AS version_periodo
+            FROM Inscripcion i
+            JOIN Estudiante e ON i.id_estudiante = e.id_estudiante
+            LEFT JOIN Curso c ON i.id_curso = c.id_curso
+            WHERE i.id_estudiante IN (
+                SELECT DISTINCT i2.id_estudiante
+                FROM Inscripcion i2
+                LEFT JOIN Curso c2 ON c2.id_curso = i2.id_curso
+                WHERE c2.codigo_programa = ?
+            )
+            ORDER BY i.id_estudiante ASC, i.id_periodo ASC, i.id_curso ASC;
+            """,
+            (codigo_programa,),
+        )
+        rows = cur.fetchall()
+    return [dict(r) for r in rows]
